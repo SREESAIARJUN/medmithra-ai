@@ -1,0 +1,120 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "containerGroupName": {
+      "type": "string",
+      "defaultValue": "clinical-insight-assistant",
+      "metadata": {
+        "description": "Name for the container group"
+      }
+    },
+    "containerImageName": {
+      "type": "string",
+      "defaultValue": "your-registry.azurecr.io/clinical-insight-assistant:latest",
+      "metadata": {
+        "description": "Container image name"
+      }
+    },
+    "mongoUrl": {
+      "type": "securestring",
+      "metadata": {
+        "description": "MongoDB connection string"
+      }
+    },
+    "geminiApiKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Gemini API key"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.ContainerInstance/containerGroups",
+      "apiVersion": "2021-09-01",
+      "name": "[parameters('containerGroupName')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "containers": [
+          {
+            "name": "clinical-insight-assistant",
+            "properties": {
+              "image": "[parameters('containerImageName')]",
+              "ports": [
+                {
+                  "port": 8080,
+                  "protocol": "TCP"
+                }
+              ],
+              "environmentVariables": [
+                {
+                  "name": "NODE_ENV",
+                  "value": "production"
+                },
+                {
+                  "name": "PORT",
+                  "value": "8080"
+                },
+                {
+                  "name": "DB_NAME",
+                  "value": "clinical_assistant"
+                },
+                {
+                  "name": "MONGO_URL",
+                  "secureValue": "[parameters('mongoUrl')]"
+                },
+                {
+                  "name": "GEMINI_API_KEY",
+                  "secureValue": "[parameters('geminiApiKey')]"
+                }
+              ],
+              "resources": {
+                "requests": {
+                  "cpu": 2,
+                  "memoryInGB": 4
+                }
+              },
+              "livenessProbe": {
+                "httpGet": {
+                  "path": "/health",
+                  "port": 8080
+                },
+                "initialDelaySeconds": 30,
+                "periodSeconds": 30,
+                "timeoutSeconds": 10
+              },
+              "readinessProbe": {
+                "httpGet": {
+                  "path": "/health",
+                  "port": 8080
+                },
+                "initialDelaySeconds": 5,
+                "periodSeconds": 10,
+                "timeoutSeconds": 5
+              }
+            }
+          }
+        ],
+        "osType": "Linux",
+        "ipAddress": {
+          "type": "Public",
+          "ports": [
+            {
+              "port": 8080,
+              "protocol": "TCP"
+            }
+          ]
+        },
+        "restartPolicy": "Always"
+      }
+    }
+  ],
+  "outputs": {
+    "containerIPv4Address": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ContainerInstance/containerGroups', parameters('containerGroupName'))).ipAddress.ip]"
+    }
+  }
+}
