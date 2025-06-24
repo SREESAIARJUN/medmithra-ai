@@ -1,0 +1,47 @@
+[
+  {
+    "patient_summary": "45-year-old male presents with chest pain and shortness of breath for 2 days. Pain is substernal, radiating to left arm, worse with exertion. Patient has history of hypertension and diabetes. Vital signs: BP 150/95, HR 88, RR 20, O2 sat 96% on room air. Physical exam reveals S4 gallop, no murmurs or rubs.",
+    "patient_id": "12345",
+    "patient_name": "John Smith",
+    "patient_age": 45,
+    "patient_gender": "Male",
+    "doctor_id": "DR001",
+    "doctor_name": "Dr. Sarah Johnson"
+  },
+  {
+    "patient_summary": "32-year-old female with 3-week history of fatigue, weight loss (10 lbs), and intermittent fever. Reports night sweats and occasional abdominal pain. No significant past medical history. Physical exam notable for mild lymphadenopathy in cervical and axillary regions. Temperature 100.2°F, otherwise stable vitals.",
+    "patient_id": "12346",
+    "patient_name": "Maria Garcia",
+    "patient_age": 32,
+    "patient_gender": "Female",
+    "doctor_id": "DR001",
+    "doctor_name": "Dr. Sarah Johnson"
+  },
+  {
+    "patient_summary": "67-year-old male with COPD presents with worsening dyspnea and productive cough with yellow-green sputum for 5 days. Patient reports increased use of rescue inhaler. History of 40 pack-year smoking, quit 5 years ago. Vitals: BP 140/85, HR 95, RR 24, O2 sat 88% on room air. Lung exam reveals decreased breath sounds and scattered wheezes.",
+    "patient_id": "12347",
+    "patient_name": "Robert Wilson",
+    "patient_age": 67,
+    "patient_gender": "Male",
+    "doctor_id": "DR001",
+    "doctor_name": "Dr. Sarah Johnson"
+  },
+  {
+    "patient_summary": "28-year-old female presents with severe abdominal pain in RLQ for 12 hours. Pain initially started periumbilical then migrated to RLQ. Associated with nausea and one episode of vomiting. Denies fever initially but now reports low-grade fever. McBurney's point tenderness positive. WBC elevated at 14,000.",
+    "patient_id": "12348",
+    "patient_name": "Emily Chen",
+    "patient_age": 28,
+    "patient_gender": "Female",
+    "doctor_id": "DR002",
+    "doctor_name": "Dr. Michael Torres"
+  },
+  {
+    "patient_summary": "55-year-old male diabetic presents for routine follow-up. Reports good adherence to metformin and lifestyle modifications. Recent HbA1c 7.2%, fasting glucose averaging 140-160 mg/dL. Blood pressure well controlled on lisinopril. Requests review of recent lab work including lipid panel and kidney function tests.",
+    "patient_id": "12349",
+    "patient_name": "David Brown",
+    "patient_age": 55,
+    "patient_gender": "Male",
+    "doctor_id": "DR002",
+    "doctor_name": "Dr. Michael Torres"
+  }
+]
