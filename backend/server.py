@@ -662,10 +662,10 @@ async def register_user(user_data: UserCreate):
         if existing_user:
             raise HTTPException(status_code=400, detail="Username already exists")
         
-        # Check if email already exists
-        existing_email = await db.users.find_one({"email": user_data.email})
-        if existing_email:
-            raise HTTPException(status_code=400, detail="Email already exists")
+        # Check if doctor_id already exists
+        existing_doctor = await db.users.find_one({"doctor_id": user_data.doctor_id})
+        if existing_doctor:
+            raise HTTPException(status_code=400, detail="Doctor ID already exists")
         
         # Create user
         password_hash = hash_password(user_data.password)
