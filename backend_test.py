@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 import time
+from datetime import datetime, timedelta
 
 # Get the backend URL from the frontend .env file
 with open('/app/frontend/.env', 'r') as f:
@@ -25,7 +26,9 @@ class ClinicalInsightAPITest(unittest.TestCase):
     def setUp(self):
         """Set up test data"""
         self.sample_patient_summary = "45-year-old male presents with chest pain, shortness of breath, and fatigue for 3 days. No previous cardiac history. Vital signs: BP 140/90, HR 95, RR 18, Temp 98.6F"
+        self.complex_patient_summary = "67-year-old female with diabetes presents with acute chest pain, elevated troponin levels, and shortness of breath. History of hypertension and smoking."
         self.case_id = None
+        self.complex_case_id = None
         
     def test_01_api_connectivity(self):
         """Test basic API connectivity"""
@@ -186,33 +189,325 @@ class ClinicalInsightAPITest(unittest.TestCase):
             
         print("✅ Specific case retrieval test passed")
         
-    def test_07_query_cases(self):
-        """Test querying cases"""
-        print("\n=== Testing Case Querying ===")
+    def test_07_query_cases_fixed(self):
+        """Test the FIXED query endpoint with various query types"""
+        print("\n=== Testing FIXED Query Endpoint ===")
         
+        # Test various query types
+        query_types = [
+            {"name": "Text search", "query": "chest pain"},
+            {"name": "Today query", "query": "today"},
+            {"name": "Yesterday query", "query": "yesterday"},
+            {"name": "Lab query", "query": "lab test"},
+            {"name": "Patient ID query", "query": "patient 123"}
+        ]
+        
+        for query_type in query_types:
+            print(f"\nTesting query type: {query_type['name']}")
+            payload = {
+                "query": query_type["query"],
+                "doctor_id": "test_doctor"
+            }
+            
+            response = requests.post(f"{API_URL}/query", json=payload)
+            print(f"Response status: {response.status_code}")
+            
+            self.assertEqual(response.status_code, 200, f"Query '{query_type['query']}' failed with status {response.status_code}")
+            response_data = response.json()
+            self.assertIn("response", response_data)
+            
+            # Check for serialization issues
+            if "cases" in response_data:
+                print(f"Query returned {len(response_data['cases'])} cases")
+                
+                # Verify no ObjectId serialization issues
+                for case in response_data["cases"]:
+                    self.assertNotIn("_id", case, "MongoDB ObjectId still present in response")
+                    
+                    # Check datetime serialization
+                    if "created_at" in case:
+                        self.assertIsInstance(case["created_at"], str, "created_at not properly serialized to string")
+                    if "updated_at" in case:
+                        self.assertIsInstance(case["updated_at"], str, "updated_at not properly serialized to string")
+                        
+                    # Check file upload dates
+                    for file_info in case.get("uploaded_files", []):
+                        if "uploaded_at" in file_info:
+                            self.assertIsInstance(file_info["uploaded_at"], str, "file uploaded_at not properly serialized to string")
+            
+        print("✅ FIXED Query endpoint test passed")
+        
+    def test_08_feedback_system(self):
+        """Test the new Feedback System"""
+        if not hasattr(self.__class__, 'case_id') or not self.__class__.case_id:
+            self.skipTest("Case ID not available. Skipping feedback system test.")
+            
+        print("\n=== Testing Feedback System ===")
+        
+        # Test positive feedback
+        print("Testing positive feedback submission")
+        positive_payload = {
+            "case_id": self.__class__.case_id,
+            "doctor_id": "test_doctor",
+            "feedback_type": "positive",
+            "feedback_text": "The analysis was very accurate and helpful."
+        }
+        
+        response = requests.post(f"{API_URL}/cases/{self.__class__.case_id}/feedback", json=positive_payload)
+        print(f"Response status: {response.status_code}")
+        
+        self.assertEqual(response.status_code, 200)
+        response_data = response.json()
+        self.assertIn("id", response_data)
+        self.assertEqual(response_data["feedback_type"], "positive")
+        
+        # Test negative feedback
+        print("\nTesting negative feedback submission")
+        negative_payload = {
+            "case_id": self.__class__.case_id,
+            "doctor_id": "test_doctor",
+            "feedback_type": "negative",
+            "feedback_text": "The differential diagnoses could be improved."
+        }
+        
+        response = requests.post(f"{API_URL}/cases/{self.__class__.case_id}/feedback", json=negative_payload)
+        print(f"Response status: {response.status_code}")
+        
+        self.assertEqual(response.status_code, 200)
+        response_data = response.json()
+        self.assertIn("id", response_data)
+        self.assertEqual(response_data["feedback_type"], "negative")
+        
+        # Test feedback statistics
+        print("\nTesting feedback statistics")
+        response = requests.get(f"{API_URL}/feedback/stats?doctor_id=test_doctor")
+        print(f"Response status: {response.status_code}")
+        
+        self.assertEqual(response.status_code, 200)
+        stats = response.json()
+        self.assertIn("positive_feedback", stats)
+        self.assertIn("negative_feedback", stats)
+        self.assertIn("total_feedback", stats)
+        self.assertIn("satisfaction_rate", stats)
+        
+        # Verify we have at least the feedback we just submitted
+        self.assertGreaterEqual(stats["positive_feedback"], 1)
+        self.assertGreaterEqual(stats["negative_feedback"], 1)
+        self.assertGreaterEqual(stats["total_feedback"], 2)
+        
+        print(f"Feedback stats: {json.dumps(stats, indent=2)}")
+        print("✅ Feedback system test passed")
+        
+    def test_09_advanced_search(self):
+        """Test Advanced Search functionality"""
+        print("\n=== Testing Advanced Search ===")
+        
+        # Create a complex case for testing advanced search
+        print("Creating a complex case for advanced search testing")
         payload = {
-            "query": "chest pain",
+            "patient_summary": self.complex_patient_summary,
             "doctor_id": "test_doctor"
         }
         
-        response = requests.post(f"{API_URL}/query", json=payload)
-        print(f"Response status: {response.status_code}")
-        
-        # This endpoint has an issue with MongoDB ObjectId serialization
-        # We'll mark this as a known issue but not fail the test
-        if response.status_code == 500:
-            print("⚠️ Known issue with query endpoint: MongoDB ObjectId serialization error")
-            print("This is a minor issue that can be fixed by updating the server.py code")
-            return
-            
+        response = requests.post(f"{API_URL}/cases", json=payload)
         self.assertEqual(response.status_code, 200)
-        response_data = response.json()
-        self.assertIn("response", response_data)
+        complex_case = response.json()
+        self.__class__.complex_case_id = complex_case["id"]
+        print(f"Created complex case with ID: {self.__class__.complex_case_id}")
         
-        if "cases" in response_data:
-            print(f"Query returned {len(response_data['cases'])} cases")
+        # Test various search filters
+        search_tests = [
+            {
+                "name": "Text search",
+                "filters": {
+                    "doctor_id": "test_doctor",
+                    "search_text": "diabetes"
+                }
+            },
+            {
+                "name": "Date range",
+                "filters": {
+                    "doctor_id": "test_doctor",
+                    "date_from": (datetime.utcnow() - timedelta(days=1)).isoformat(),
+                    "date_to": (datetime.utcnow() + timedelta(days=1)).isoformat()
+                }
+            },
+            {
+                "name": "Has files filter",
+                "filters": {
+                    "doctor_id": "test_doctor",
+                    "has_files": False
+                }
+            },
+            {
+                "name": "Combined filters",
+                "filters": {
+                    "doctor_id": "test_doctor",
+                    "search_text": "chest",
+                    "date_from": (datetime.utcnow() - timedelta(days=1)).isoformat()
+                }
+            }
+        ]
+        
+        for test in search_tests:
+            print(f"\nTesting {test['name']}")
+            response = requests.post(f"{API_URL}/cases/search", json=test["filters"])
+            print(f"Response status: {response.status_code}")
             
-        print("✅ Case querying test passed")
+            self.assertEqual(response.status_code, 200)
+            result = response.json()
+            self.assertIn("cases", result)
+            self.assertIn("total_found", result)
+            self.assertIn("filters_applied", result)
+            
+            print(f"Found {result['total_found']} cases")
+            
+            # Verify no serialization issues
+            if result["cases"]:
+                for case in result["cases"]:
+                    self.assertNotIn("_id", case, "MongoDB ObjectId still present in response")
+                    
+                    # Check datetime serialization
+                    if "created_at" in case:
+                        self.assertIsInstance(case["created_at"], str, "created_at not properly serialized to string")
+                    if "updated_at" in case:
+                        self.assertIsInstance(case["updated_at"], str, "updated_at not properly serialized to string")
+        
+        print("✅ Advanced search test passed")
+        
+    def test_10_complete_workflow(self):
+        """Test the complete enhanced workflow"""
+        print("\n=== Testing Complete Enhanced Workflow ===")
+        
+        # 1. Create a case with complex patient data
+        print("1. Creating a case with complex patient data")
+        payload = {
+            "patient_summary": "67-year-old female with diabetes presents with acute chest pain, elevated troponin levels, and shortness of breath. History of hypertension and smoking.",
+            "doctor_id": "test_doctor"
+        }
+        
+        response = requests.post(f"{API_URL}/cases", json=payload)
+        self.assertEqual(response.status_code, 200)
+        workflow_case = response.json()
+        workflow_case_id = workflow_case["id"]
+        print(f"Created case with ID: {workflow_case_id}")
+        
+        # 2. Upload multiple files
+        print("\n2. Uploading multiple files")
+        files = []
+        temp_paths = []
+        
+        # Create temporary files
+        file_contents = [
+            {
+                "name": "ecg_results.txt",
+                "content": b"ECG Results: ST elevation in leads V1-V4. Possible anterior wall MI.",
+                "type": "text/plain"
+            },
+            {
+                "name": "lab_results.txt",
+                "content": b"Lab Results: Troponin I: 2.3 ng/mL (elevated). WBC: 12,000/uL. Glucose: 180 mg/dL.",
+                "type": "text/plain"
+            }
+        ]
+        
+        try:
+            for file_info in file_contents:
+                with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as temp:
+                    temp.write(file_info["content"])
+                    temp_path = temp.name
+                    temp_paths.append(temp_path)
+                    files.append(('files', (file_info["name"], open(temp_path, 'rb'), file_info["type"])))
+            
+            response = requests.post(
+                f"{API_URL}/cases/{workflow_case_id}/upload",
+                files=files
+            )
+            
+            self.assertEqual(response.status_code, 200)
+            upload_result = response.json()
+            self.assertEqual(len(upload_result["files"]), 2)
+            print(f"Successfully uploaded {len(upload_result['files'])} files")
+            
+        finally:
+            # Close file handles
+            for file_tuple in files:
+                file_tuple[1][1].close()
+                
+            # Clean up temporary files
+            for temp_path in temp_paths:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+        
+        # 3. Analyze with Gemini
+        print("\n3. Analyzing case with Gemini")
+        response = requests.post(f"{API_URL}/cases/{workflow_case_id}/analyze")
+        self.assertEqual(response.status_code, 200)
+        analysis_result = response.json()
+        self.assertIn("soap_note", analysis_result)
+        self.assertIn("differential_diagnoses", analysis_result)
+        print("Successfully analyzed case with Gemini")
+        
+        # 4. Submit feedback
+        print("\n4. Submitting feedback")
+        feedback_payload = {
+            "case_id": workflow_case_id,
+            "doctor_id": "test_doctor",
+            "feedback_type": "positive",
+            "feedback_text": "Excellent analysis with accurate differential diagnoses."
+        }
+        
+        response = requests.post(f"{API_URL}/cases/{workflow_case_id}/feedback", json=feedback_payload)
+        self.assertEqual(response.status_code, 200)
+        print("Successfully submitted feedback")
+        
+        # 5. Search for the case using advanced filters
+        print("\n5. Searching for the case using advanced filters")
+        search_payload = {
+            "doctor_id": "test_doctor",
+            "search_text": "diabetes chest pain",
+            "has_files": True
+        }
+        
+        response = requests.post(f"{API_URL}/cases/search", json=search_payload)
+        self.assertEqual(response.status_code, 200)
+        search_result = response.json()
+        self.assertIn("cases", search_result)
+        
+        # Check if our workflow case is in the results
+        found_case = False
+        for case in search_result["cases"]:
+            if case["id"] == workflow_case_id:
+                found_case = True
+                break
+                
+        self.assertTrue(found_case, "Workflow case not found in search results")
+        print("Successfully found case using advanced search")
+        
+        # 6. Query the case using natural language
+        print("\n6. Querying the case using natural language")
+        query_payload = {
+            "query": "Show cases with chest pain and diabetes",
+            "doctor_id": "test_doctor"
+        }
+        
+        response = requests.post(f"{API_URL}/query", json=query_payload)
+        self.assertEqual(response.status_code, 200)
+        query_result = response.json()
+        self.assertIn("response", query_result)
+        self.assertIn("cases", query_result)
+        
+        # Check if our workflow case is in the results
+        found_case = False
+        for case in query_result["cases"]:
+            if case["id"] == workflow_case_id:
+                found_case = True
+                break
+                
+        self.assertTrue(found_case, "Workflow case not found in query results")
+        print("Successfully queried case using natural language")
+        
+        print("✅ Complete enhanced workflow test passed")
 
 if __name__ == "__main__":
     # Run the tests in order
