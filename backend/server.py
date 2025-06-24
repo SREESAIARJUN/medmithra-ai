@@ -87,6 +87,34 @@ class CaseFeedbackCreate(BaseModel):
     feedback_type: str  # "positive", "negative"
     feedback_text: Optional[str] = None
 
+class User(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    username: str
+    email: str
+    password_hash: str
+    full_name: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_login: Optional[datetime] = None
+
+class UserCreate(BaseModel):
+    username: str
+    email: str
+    password: str
+    full_name: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class AuditLog(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    action: str  # "case_created", "case_viewed", "case_analyzed", "feedback_submitted", "login", "logout"
+    resource_id: Optional[str] = None  # case_id, file_id, etc.
+    details: Optional[str] = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    ip_address: Optional[str] = None
+
 class SearchFilters(BaseModel):
     doctor_id: str = "default_doctor"
     date_from: Optional[str] = None
