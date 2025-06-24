@@ -324,29 +324,120 @@ async def get_case(case_id: str):
 
 @api_router.post("/query")
 async def query_cases(query_data: RetrievalQuery):
-    """Handle natural language queries about cases"""
+    """Handle natural language queries about cases with improved command parsing"""
     try:
-        # Simple query processing for now
+        # Advanced query processing
         query_lower = query_data.query.lower()
         
-        # Search cases by patient summary or analysis results
-        cases = await db.clinical_cases.find({
-            "doctor_id": query_data.doctor_id,
-            "$or": [
-                {"patient_summary": {"$regex": query_lower, "$options": "i"}},
-                {"analysis_result.overall_assessment": {"$regex": query_lower, "$options": "i"}}
-            ]
-        }).to_list(10)
+        # Parse specific commands
+        response_text = ""
+        cases = []
+        
+        # Check for date-specific queries
+        if "yesterday" in query_lower:
+            from datetime import datetime, timedelta
+            yesterday = datetime.utcnow() - timedelta(days=1)
+            start_date = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
+            
+            cases = await db.clinical_cases.find({
+                "doctor_id": query_data.doctor_id,
+                "created_at": {
+                    "$gte": start_date,
+                    "$lte": end_date
+                }
+            }).to_list(10)
+            
+            response_text = f"Found {len(cases)} cases from yesterday"
+            
+        elif "today" in query_lower:
+            from datetime import datetime
+            today = datetime.utcnow()
+            start_date = today.replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            cases = await db.clinical_cases.find({
+                "doctor_id": query_data.doctor_id,
+                "created_at": {"$gte": start_date}
+            }).to_list(10)
+            
+            response_text = f"Found {len(cases)} cases from today"
+            
+        # Check for specific test types
+        elif any(test in query_lower for test in ["cbc", "blood", "lab", "test"]):
+            cases = await db.clinical_cases.find({
+                "doctor_id": query_data.doctor_id,
+                "$or": [
+                    {"patient_summary": {"$regex": "lab|blood|cbc|test", "$options": "i"}},
+                    {"analysis_result.investigation_suggestions": {"$regex": "lab|blood|cbc|test", "$options": "i"}}
+                ]
+            }).to_list(10)
+            
+            response_text = f"Found {len(cases)} cases with lab/blood work"
+            
+        # Check for specific patient ID
+        elif "patient" in query_lower and any(char.isdigit() for char in query_lower):
+            import re
+            patient_id_match = re.search(r'patient\s*(\d+)', query_lower)
+            if patient_id_match:
+                patient_id = patient_id_match.group(1)
+                cases = await db.clinical_cases.find({
+                    "doctor_id": query_data.doctor_id,
+                    "patient_summary": {"$regex": patient_id, "$options": "i"}
+                }).to_list(10)
+                
+                response_text = f"Found {len(cases)} cases for patient {patient_id}"
+            
+        # General text search
+        else:
+            cases = await db.clinical_cases.find({
+                "doctor_id": query_data.doctor_id,
+                "$or": [
+                    {"patient_summary": {"$regex": query_lower, "$options": "i"}},
+                    {"analysis_result.overall_assessment": {"$regex": query_lower, "$options": "i"}},
+                    {"analysis_result.soap_note.subjective": {"$regex": query_lower, "$options": "i"}},
+                    {"analysis_result.soap_note.assessment": {"$regex": query_lower, "$options": "i"}}
+                ]
+            }).to_list(10)
+            
+            response_text = f"Found {len(cases)} matching cases for: {query_data.query}"
         
         if not cases:
             return {"response": "No matching cases found for your query."}
         
-        # Format response
-        response_text = f"Found {len(cases)} matching cases:\n"
-        for case in cases[:3]:  # Show top 3
-            response_text += f"- Case from {case['created_at'].strftime('%Y-%m-%d')}: {case['patient_summary'][:100]}...\n"
+        # Convert MongoDB documents to serializable format
+        serializable_cases = []
+        for case in cases:
+            # Convert ObjectId to string if present
+            if "_id" in case:
+                del case["_id"]  # Remove MongoDB ObjectId
+            
+            # Convert datetime objects to ISO format strings
+            if "created_at" in case and hasattr(case["created_at"], "isoformat"):
+                case["created_at"] = case["created_at"].isoformat()
+            if "updated_at" in case and hasattr(case["updated_at"], "isoformat"):
+                case["updated_at"] = case["updated_at"].isoformat()
+                
+            # Convert file upload dates
+            for file_info in case.get("uploaded_files", []):
+                if "uploaded_at" in file_info and hasattr(file_info["uploaded_at"], "isoformat"):
+                    file_info["uploaded_at"] = file_info["uploaded_at"].isoformat()
+            
+            serializable_cases.append(case)
         
-        return {"response": response_text, "cases": cases}
+        # Add case summaries to response
+        if serializable_cases:
+            response_text += ":\n"
+            for case in serializable_cases[:3]:  # Show top 3
+                case_date = case.get('created_at', 'Unknown date')
+                if isinstance(case_date, str):
+                    try:
+                        case_date = datetime.fromisoformat(case_date.replace('Z', '+00:00')).strftime('%Y-%m-%d')
+                    except:
+                        case_date = case_date[:10] if len(case_date) > 10 else case_date
+                        
+                response_text += f"- Case from {case_date}: {case['patient_summary'][:100]}...\n"
+        
+        return {"response": response_text, "cases": serializable_cases}
         
     except Exception as e:
         logging.error(f"Query error: {str(e)}")
