@@ -79,12 +79,47 @@ const useSpeechRecognition = () => {
   };
 };
 
+// Collapsible Component
+const CollapsibleSection = ({ title, children, defaultOpen = false }) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div className="collapsible-section">
+      <button 
+        className="collapsible-header"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span>{title}</span>
+        <span className={`collapsible-icon ${isOpen ? 'open' : ''}`}>▼</span>
+      </button>
+      {isOpen && (
+        <div className="collapsible-content">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const App = () => {
-  const [currentView, setCurrentView] = useState('home');
+  const [currentView, setCurrentView] = useState('login');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [sessionToken, setSessionToken] = useState(localStorage.getItem('sessionToken'));
+  
   const [cases, setCases] = useState([]);
   const [selectedCase, setSelectedCase] = useState(null);
   const [loading, setLoading] = useState(false);
   const [feedbackStats, setFeedbackStats] = useState(null);
+  
+  // Authentication state
+  const [loginData, setLoginData] = useState({ username: '', password: '' });
+  const [registerData, setRegisterData] = useState({ 
+    username: '', 
+    email: '', 
+    password: '', 
+    full_name: '' 
+  });
   
   // New case form state
   const [patientSummary, setPatientSummary] = useState('');
@@ -115,11 +150,21 @@ const App = () => {
     hasRecognitionSupport
   } = useSpeechRecognition();
 
-  // Load cases and feedback stats on component mount
+  // Check authentication on component mount
   useEffect(() => {
-    loadCases();
-    loadFeedbackStats();
+    checkAuthentication();
   }, []);
+
+  // Load cases and feedback stats when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadCases();
+      loadFeedbackStats();
+      if (currentView === 'login' || currentView === 'register') {
+        setCurrentView('home');
+      }
+    }
+  }, [isAuthenticated]);
 
   // Update patient summary when speech transcript changes
   useEffect(() => {
@@ -129,9 +174,82 @@ const App = () => {
     }
   }, [transcript, currentView, resetTranscript]);
 
-  const loadCases = async () => {
+  const checkAuthentication = async () => {
+    if (!sessionToken) {
+      setCurrentView('login');
+      return;
+    }
+
     try {
-      const response = await axios.get(`${API}/cases`);
+      const response = await axios.get(`${API}/auth/verify?session_token=${sessionToken}`);
+      if (response.data.valid) {
+        setIsAuthenticated(true);
+        setCurrentUser(response.data.user);
+      } else {
+        logout();
+      }
+    } catch (error) {
+      console.error('Authentication check failed:', error);
+      logout();
+    }
+  };
+
+  const login = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.post(`${API}/auth/login`, loginData);
+      const { session_token, user } = response.data;
+      
+      setSessionToken(session_token);
+      localStorage.setItem('sessionToken', session_token);
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      setLoginData({ username: '', password: '' });
+      
+    } catch (error) {
+      console.error('Login failed:', error);
+      alert(error.response?.data?.detail || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const register = async () => {
+    setLoading(true);
+    try {
+      await axios.post(`${API}/auth/register`, registerData);
+      alert('Registration successful! Please login.');
+      setCurrentView('login');
+      setRegisterData({ username: '', email: '', password: '', full_name: '' });
+      
+    } catch (error) {
+      console.error('Registration failed:', error);
+      alert(error.response?.data?.detail || 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      if (sessionToken) {
+        await axios.post(`${API}/auth/logout?session_token=${sessionToken}`);
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setSessionToken(null);
+      localStorage.removeItem('sessionToken');
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+      setCurrentView('login');
+    }
+  };
+
+  const loadCases = async () => {
+    if (!currentUser) return;
+    try {
+      const response = await axios.get(`${API}/cases?doctor_id=${currentUser.id}`);
       setCases(response.data);
     } catch (error) {
       console.error('Error loading cases:', error);
@@ -139,8 +257,9 @@ const App = () => {
   };
 
   const loadFeedbackStats = async () => {
+    if (!currentUser) return;
     try {
-      const response = await axios.get(`${API}/feedback/stats`);
+      const response = await axios.get(`${API}/feedback/stats?doctor_id=${currentUser.id}`);
       setFeedbackStats(response.data);
     } catch (error) {
       console.error('Error loading feedback stats:', error);
@@ -158,7 +277,7 @@ const App = () => {
       // Create case
       const caseResponse = await axios.post(`${API}/cases`, {
         patient_summary: patientSummary,
-        doctor_id: 'default_doctor'
+        doctor_id: currentUser.id
       });
       
       const caseId = caseResponse.data.id;
@@ -179,7 +298,7 @@ const App = () => {
       
       // Analyze case
       const analysisResponse = await axios.post(`${API}/cases/${caseId}/analyze`);
-      setAnalysisResult(analysisResponse.data);
+      setAnalysisResult({...analysisResponse.data, case_id: caseId});
       
       // Reset form
       setPatientSummary('');
@@ -200,7 +319,7 @@ const App = () => {
     try {
       await axios.post(`${API}/cases/${caseId}/feedback`, {
         case_id: caseId,
-        doctor_id: 'default_doctor',
+        doctor_id: currentUser.id,
         feedback_type: feedbackType,
         feedback_text: feedbackText
       });
@@ -212,6 +331,28 @@ const App = () => {
     } catch (error) {
       console.error('Error submitting feedback:', error);
       alert('Error submitting feedback');
+    }
+  };
+
+  const exportToPDF = async (caseId) => {
+    try {
+      const response = await axios.get(`${API}/cases/${caseId}/export-pdf`, {
+        responseType: 'blob'
+      });
+      
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `case_${caseId.substring(0, 8)}_report.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      alert('Error exporting PDF');
     }
   };
 
@@ -227,7 +368,7 @@ const App = () => {
     try {
       const response = await axios.post(`${API}/query`, {
         query: query,
-        doctor_id: 'default_doctor'
+        doctor_id: currentUser.id
       });
       setQueryResult(response.data);
     } catch (error) {
@@ -242,7 +383,7 @@ const App = () => {
     setLoading(true);
     try {
       const filters = {
-        doctor_id: 'default_doctor',
+        doctor_id: currentUser.id,
         ...searchFilters
       };
       
@@ -273,12 +414,104 @@ const App = () => {
     }
   };
 
+  const renderLogin = () => (
+    <div className="auth-container">
+      <div className="auth-form">
+        <h2>Login to Clinical Insight Assistant</h2>
+        <div className="form-group">
+          <label>Username</label>
+          <input
+            type="text"
+            value={loginData.username}
+            onChange={(e) => setLoginData({...loginData, username: e.target.value})}
+            placeholder="Enter your username"
+          />
+        </div>
+        <div className="form-group">
+          <label>Password</label>
+          <input
+            type="password"
+            value={loginData.password}
+            onChange={(e) => setLoginData({...loginData, password: e.target.value})}
+            placeholder="Enter your password"
+          />
+        </div>
+        <button 
+          className="auth-button"
+          onClick={login}
+          disabled={loading || !loginData.username || !loginData.password}
+        >
+          {loading ? 'Logging in...' : 'Login'}
+        </button>
+        <p className="auth-switch">
+          Don't have an account? 
+          <button onClick={() => setCurrentView('register')}>Register</button>
+        </p>
+      </div>
+    </div>
+  );
+
+  const renderRegister = () => (
+    <div className="auth-container">
+      <div className="auth-form">
+        <h2>Register for Clinical Insight Assistant</h2>
+        <div className="form-group">
+          <label>Full Name</label>
+          <input
+            type="text"
+            value={registerData.full_name}
+            onChange={(e) => setRegisterData({...registerData, full_name: e.target.value})}
+            placeholder="Enter your full name"
+          />
+        </div>
+        <div className="form-group">
+          <label>Username</label>
+          <input
+            type="text"
+            value={registerData.username}
+            onChange={(e) => setRegisterData({...registerData, username: e.target.value})}
+            placeholder="Choose a username"
+          />
+        </div>
+        <div className="form-group">
+          <label>Email</label>
+          <input
+            type="email"
+            value={registerData.email}
+            onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
+            placeholder="Enter your email"
+          />
+        </div>
+        <div className="form-group">
+          <label>Password</label>
+          <input
+            type="password"
+            value={registerData.password}
+            onChange={(e) => setRegisterData({...registerData, password: e.target.value})}
+            placeholder="Choose a password"
+          />
+        </div>
+        <button 
+          className="auth-button"
+          onClick={register}
+          disabled={loading || !registerData.username || !registerData.password || !registerData.email || !registerData.full_name}
+        >
+          {loading ? 'Registering...' : 'Register'}
+        </button>
+        <p className="auth-switch">
+          Already have an account? 
+          <button onClick={() => setCurrentView('login')}>Login</button>
+        </p>
+      </div>
+    </div>
+  );
+
   const renderHome = () => (
     <div className="home-container">
       <div className="hero-section">
         <div className="hero-content">
           <h1 className="hero-title">
-            Clinical Insight Assistant
+            Welcome, Dr. {currentUser?.full_name || currentUser?.username}
           </h1>
           <p className="hero-subtitle">
             AI-powered multimodal analysis for comprehensive patient care
@@ -436,36 +669,46 @@ const App = () => {
         <div className="analysis-results">
           <div className="analysis-header">
             <h3>Clinical Analysis Results</h3>
-            <div className="feedback-buttons">
+            <div className="action-buttons">
+              <div className="feedback-buttons">
+                <button 
+                  className="feedback-positive"
+                  onClick={() => submitFeedback(analysisResult.case_id, 'positive')}
+                  title="Good analysis"
+                >
+                  👍 Good
+                </button>
+                <button 
+                  className="feedback-negative"
+                  onClick={() => submitFeedback(analysisResult.case_id, 'negative')}
+                  title="Poor analysis"
+                >
+                  👎 Poor
+                </button>
+              </div>
               <button 
-                className="feedback-positive"
-                onClick={() => submitFeedback(analysisResult.case_id, 'positive')}
-                title="Good analysis"
+                className="export-button"
+                onClick={() => exportToPDF(analysisResult.case_id)}
+                title="Export to PDF"
               >
-                👍 Good
-              </button>
-              <button 
-                className="feedback-negative"
-                onClick={() => submitFeedback(analysisResult.case_id, 'negative')}
-                title="Poor analysis"
-              >
-                👎 Poor
+                📄 Export PDF
               </button>
             </div>
           </div>
           
-          <div className="confidence-score">
-            <h4>Confidence Score: {analysisResult.confidence_score}%</h4>
-            <div className="confidence-bar">
-              <div 
-                className="confidence-fill"
-                style={{width: `${analysisResult.confidence_score}%`}}
-              />
+          <CollapsibleSection title="Confidence Score" defaultOpen={true}>
+            <div className="confidence-score">
+              <h4>Confidence Score: {analysisResult.confidence_score}%</h4>
+              <div className="confidence-bar">
+                <div 
+                  className="confidence-fill"
+                  style={{width: `${analysisResult.confidence_score}%`}}
+                />
+              </div>
             </div>
-          </div>
+          </CollapsibleSection>
           
-          <div className="soap-notes">
-            <h4>SOAP Notes</h4>
+          <CollapsibleSection title="SOAP Notes" defaultOpen={true}>
             <div className="soap-grid">
               <div className="soap-item">
                 <h5>Subjective</h5>
@@ -484,10 +727,9 @@ const App = () => {
                 <p>{analysisResult.soap_note.plan}</p>
               </div>
             </div>
-          </div>
+          </CollapsibleSection>
           
-          <div className="diagnoses">
-            <h4>Differential Diagnoses</h4>
+          <CollapsibleSection title="Differential Diagnoses" defaultOpen={true}>
             {analysisResult.differential_diagnoses.map((diagnosis, index) => (
               <div key={index} className="diagnosis-item">
                 <div className="diagnosis-header">
@@ -497,32 +739,58 @@ const App = () => {
                 <p className="diagnosis-rationale">{diagnosis.rationale}</p>
               </div>
             ))}
-          </div>
+          </CollapsibleSection>
           
-          <div className="recommendations">
-            <div className="recommendation-section">
-              <h4>Treatment Recommendations</h4>
-              <ul>
-                {analysisResult.treatment_recommendations.map((rec, index) => (
-                  <li key={index}>{rec}</li>
-                ))}
-              </ul>
+          <CollapsibleSection title="Recommendations & Investigations">
+            <div className="recommendations">
+              <div className="recommendation-section">
+                <h4>Treatment Recommendations</h4>
+                <ul>
+                  {analysisResult.treatment_recommendations.map((rec, index) => (
+                    <li key={index}>{rec}</li>
+                  ))}
+                </ul>
+              </div>
+              
+              <div className="recommendation-section">
+                <h4>Investigation Suggestions</h4>
+                <ul>
+                  {analysisResult.investigation_suggestions.map((inv, index) => (
+                    <li key={index}>{inv}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
-            
-            <div className="recommendation-section">
-              <h4>Investigation Suggestions</h4>
-              <ul>
-                {analysisResult.investigation_suggestions.map((inv, index) => (
-                  <li key={index}>{inv}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          </CollapsibleSection>
+
+          {analysisResult.file_interpretations && analysisResult.file_interpretations.length > 0 && (
+            <CollapsibleSection title="Individual File Interpretations">
+              {analysisResult.file_interpretations.map((interpretation, index) => (
+                <div key={index} className="file-interpretation">
+                  <h5>📁 {interpretation.file_name}</h5>
+                  <div className="interpretation-details">
+                    <p><strong>Type:</strong> {interpretation.file_type}</p>
+                    {interpretation.key_findings && interpretation.key_findings.length > 0 && (
+                      <p><strong>Key Findings:</strong> {interpretation.key_findings.join(', ')}</p>
+                    )}
+                    {interpretation.abnormal_values && interpretation.abnormal_values.length > 0 && (
+                      <p><strong>Abnormal Values:</strong> {interpretation.abnormal_values.join(', ')}</p>
+                    )}
+                    <p><strong>Clinical Significance:</strong> {interpretation.clinical_significance}</p>
+                    {interpretation.recommendations && interpretation.recommendations.length > 0 && (
+                      <p><strong>Recommendations:</strong> {interpretation.recommendations.join(', ')}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </CollapsibleSection>
+          )}
           
-          <div className="overall-assessment">
-            <h4>Overall Assessment</h4>
-            <p>{analysisResult.overall_assessment}</p>
-          </div>
+          <CollapsibleSection title="Overall Assessment">
+            <div className="overall-assessment">
+              <p>{analysisResult.overall_assessment}</p>
+            </div>
+          </CollapsibleSection>
         </div>
       )}
     </div>
@@ -654,12 +922,23 @@ const App = () => {
                   {case_item.confidence_score}% confidence
                 </span>
               )}
-              <button 
-                className="view-button"
-                onClick={() => viewCase(case_item.id)}
-              >
-                View Details
-              </button>
+              <div className="case-actions">
+                <button 
+                  className="view-button"
+                  onClick={() => viewCase(case_item.id)}
+                >
+                  View Details
+                </button>
+                {case_item.analysis_result && (
+                  <button 
+                    className="export-button-small"
+                    onClick={() => exportToPDF(case_item.id)}
+                    title="Export to PDF"
+                  >
+                    📄
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -671,12 +950,23 @@ const App = () => {
     <div className="case-detail-container">
       <div className="case-detail-header">
         <h2>Case Details</h2>
-        <button 
-          className="back-button"
-          onClick={() => setCurrentView('cases')}
-        >
-          ← Back to Cases
-        </button>
+        <div className="header-actions">
+          {selectedCase?.analysis_result && (
+            <button 
+              className="export-button"
+              onClick={() => exportToPDF(selectedCase.id)}
+              title="Export to PDF"
+            >
+              📄 Export PDF
+            </button>
+          )}
+          <button 
+            className="back-button"
+            onClick={() => setCurrentView('cases')}
+          >
+            ← Back to Cases
+          </button>
+        </div>
       </div>
       
       {selectedCase && (
@@ -713,18 +1003,19 @@ const App = () => {
                 </div>
               </div>
               
-              <div className="confidence-score">
-                <h4>Confidence Score: {selectedCase.confidence_score}%</h4>
-                <div className="confidence-bar">
-                  <div 
-                    className="confidence-fill"
-                    style={{width: `${selectedCase.confidence_score}%`}}
-                  />
+              <CollapsibleSection title="Confidence Score" defaultOpen={true}>
+                <div className="confidence-score">
+                  <h4>Confidence Score: {selectedCase.confidence_score}%</h4>
+                  <div className="confidence-bar">
+                    <div 
+                      className="confidence-fill"
+                      style={{width: `${selectedCase.confidence_score}%`}}
+                    />
+                  </div>
                 </div>
-              </div>
+              </CollapsibleSection>
               
-              <div className="soap-notes">
-                <h4>SOAP Notes</h4>
+              <CollapsibleSection title="SOAP Notes" defaultOpen={true}>
                 <div className="soap-grid">
                   <div className="soap-item">
                     <h5>Subjective</h5>
@@ -743,18 +1034,51 @@ const App = () => {
                     <p>{selectedCase.analysis_result.soap_note.plan}</p>
                   </div>
                 </div>
-              </div>
+              </CollapsibleSection>
+
+              {selectedCase.analysis_result.file_interpretations && selectedCase.analysis_result.file_interpretations.length > 0 && (
+                <CollapsibleSection title="Individual File Interpretations">
+                  {selectedCase.analysis_result.file_interpretations.map((interpretation, index) => (
+                    <div key={index} className="file-interpretation">
+                      <h5>📁 {interpretation.file_name}</h5>
+                      <div className="interpretation-details">
+                        <p><strong>Type:</strong> {interpretation.file_type}</p>
+                        {interpretation.key_findings && interpretation.key_findings.length > 0 && (
+                          <p><strong>Key Findings:</strong> {interpretation.key_findings.join(', ')}</p>
+                        )}
+                        {interpretation.abnormal_values && interpretation.abnormal_values.length > 0 && (
+                          <p><strong>Abnormal Values:</strong> {interpretation.abnormal_values.join(', ')}</p>
+                        )}
+                        <p><strong>Clinical Significance:</strong> {interpretation.clinical_significance}</p>
+                        {interpretation.recommendations && interpretation.recommendations.length > 0 && (
+                          <p><strong>Recommendations:</strong> {interpretation.recommendations.join(', ')}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </CollapsibleSection>
+              )}
               
-              <div className="overall-assessment">
-                <h4>Overall Assessment</h4>
-                <p>{selectedCase.analysis_result.overall_assessment}</p>
-              </div>
+              <CollapsibleSection title="Overall Assessment">
+                <div className="overall-assessment">
+                  <p>{selectedCase.analysis_result.overall_assessment}</p>
+                </div>
+              </CollapsibleSection>
             </div>
           )}
         </div>
       )}
     </div>
   );
+
+  if (!isAuthenticated) {
+    return (
+      <div className="app">
+        {currentView === 'login' && renderLogin()}
+        {currentView === 'register' && renderRegister()}
+      </div>
+    );
+  }
 
   return (
     <div className="app">
@@ -781,6 +1105,10 @@ const App = () => {
           >
             Cases
           </button>
+          <div className="user-menu">
+            <span>Dr. {currentUser?.full_name || currentUser?.username}</span>
+            <button className="logout-button" onClick={logout}>Logout</button>
+          </div>
         </div>
       </nav>
 
