@@ -78,8 +78,8 @@ Healthcare professionals need a tool that can:
 
 ### 1. Clone Repository
 ```bash
-git clone <repository-url>
-cd clinical-insight-assistant
+git clone https://github.com/SREESAIARJUN/medmithra-ai.git
+cd medmithra-ai
 ```
 
 ### 2. Environment Setup
