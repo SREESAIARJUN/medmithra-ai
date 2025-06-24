@@ -973,124 +973,191 @@ async def get_case(case_id: str):
 
 @api_router.post("/query")
 async def query_cases(query_data: RetrievalQuery):
-    """Handle natural language queries about cases with improved command parsing"""
+    """Handle natural language queries about cases with enhanced command parsing"""
     try:
-        # Advanced query processing
+        import re
+        from datetime import datetime, timedelta
+        
+        # Enhanced query processing with better pattern matching
         query_lower = query_data.query.lower()
+        doctor_id = query_data.doctor_id
         
-        # Parse specific commands
+        # Initialize response components
+        cases_found = []
         response_text = ""
-        cases = []
         
-        # Check for date-specific queries
-        if "yesterday" in query_lower:
-            from datetime import datetime, timedelta
-            yesterday = datetime.utcnow() - timedelta(days=1)
-            start_date = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
-            end_date = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
+        # Enhanced pattern matching for different query types
+        patterns = {
+            # Date patterns
+            'yesterday': r'\b(yesterday|last\s*day)\b',
+            'today': r'\b(today|this\s*day)\b',
+            'last_week': r'\b(last\s*week|past\s*week)\b',
+            'last_month': r'\b(last\s*month|past\s*month)\b',
             
-            cases = await db.clinical_cases.find({
-                "doctor_id": query_data.doctor_id,
+            # Test type patterns
+            'cbc': r'\b(cbc|complete\s*blood\s*count|blood\s*count)\b',
+            'xray': r'\b(x-?ray|xray|chest\s*x-?ray|radiograph)\b',
+            'ct_scan': r'\b(ct\s*scan|computed\s*tomography|cat\s*scan)\b',
+            'mri': r'\b(mri|magnetic\s*resonance)\b',
+            'lab': r'\b(lab|laboratory|blood\s*test|lab\s*result)\b',
+            
+            # Patient ID patterns
+            'patient_id': r'\b(?:patient|id|case)\s*(?:#|id|number)?\s*(\d+)\b',
+            
+            # General patterns
+            'summary': r'\b(summary|report|result|finding)\b',
+            'analysis': r'\b(analysis|interpret|analyze|diagnos)\b'
+        }
+        
+        # Extract patient ID if present
+        patient_id_match = re.search(patterns['patient_id'], query_lower)
+        patient_id = patient_id_match.group(1) if patient_id_match else None
+        
+        # Determine date range
+        date_filter = {}
+        current_date = datetime.utcnow()
+        
+        if re.search(patterns['yesterday'], query_lower):
+            yesterday = current_date - timedelta(days=1)
+            date_filter = {
                 "created_at": {
-                    "$gte": start_date,
-                    "$lte": end_date
+                    "$gte": yesterday.replace(hour=0, minute=0, second=0, microsecond=0),
+                    "$lt": yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
                 }
-            }).to_list(10)
+            }
+            response_text += "Searching yesterday's cases. "
             
-            response_text = f"Found {len(cases)} cases from yesterday"
+        elif re.search(patterns['today'], query_lower):
+            today = current_date
+            date_filter = {
+                "created_at": {
+                    "$gte": today.replace(hour=0, minute=0, second=0, microsecond=0),
+                    "$lt": today.replace(hour=23, minute=59, second=59, microsecond=999999)
+                }
+            }
+            response_text += "Searching today's cases. "
             
-        elif "today" in query_lower:
-            from datetime import datetime
-            today = datetime.utcnow()
-            start_date = today.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif re.search(patterns['last_week'], query_lower):
+            last_week = current_date - timedelta(days=7)
+            date_filter = {
+                "created_at": {"$gte": last_week}
+            }
+            response_text += "Searching last week's cases. "
             
-            cases = await db.clinical_cases.find({
-                "doctor_id": query_data.doctor_id,
-                "created_at": {"$gte": start_date}
-            }).to_list(10)
+        elif re.search(patterns['last_month'], query_lower):
+            last_month = current_date - timedelta(days=30)
+            date_filter = {
+                "created_at": {"$gte": last_month}
+            }
+            response_text += "Searching last month's cases. "
+        
+        # Build query filter
+        query_filter = {"doctor_id": doctor_id}
+        query_filter.update(date_filter)
+        
+        # Add patient ID filter if specified
+        if patient_id:
+            query_filter["patient_id"] = patient_id
+            response_text += f"Looking for patient ID {patient_id}. "
+        
+        # Search cases
+        cases_cursor = db.clinical_cases.find(query_filter).sort("created_at", -1)
+        cases_found = await cases_cursor.to_list(50)  # Limit to 50 cases
+        
+        if not cases_found:
+            return {
+                "response": f"No cases found matching your query: '{query_data.query}'. Try different search terms or check if the patient ID exists.",
+                "cases_found": 0,
+                "cases": []
+            }
+        
+        # Determine what information to extract based on query intent
+        filtered_results = []
+        
+        for case in cases_found:
+            case_info = {
+                "id": case["id"],
+                "patient_id": case.get("patient_id", "N/A"),
+                "patient_name": case.get("patient_name", "N/A"),
+                "created_at": case["created_at"].isoformat() if hasattr(case["created_at"], "isoformat") else str(case["created_at"]),
+                "patient_summary": case["patient_summary"][:200] + "..." if len(case["patient_summary"]) > 200 else case["patient_summary"],
+                "uploaded_files": len(case.get("uploaded_files", [])),
+                "confidence_score": case.get("confidence_score", 0)
+            }
             
-            response_text = f"Found {len(cases)} cases from today"
-            
-        # Check for specific test types
-        elif any(test in query_lower for test in ["cbc", "blood", "lab", "test"]):
-            cases = await db.clinical_cases.find({
-                "doctor_id": query_data.doctor_id,
-                "$or": [
-                    {"patient_summary": {"$regex": "lab|blood|cbc|test", "$options": "i"}},
-                    {"analysis_result.investigation_suggestions": {"$regex": "lab|blood|cbc|test", "$options": "i"}}
-                ]
-            }).to_list(10)
-            
-            response_text = f"Found {len(cases)} cases with lab/blood work"
-            
-        # Check for specific patient ID
-        elif "patient" in query_lower and any(char.isdigit() for char in query_lower):
-            import re
-            patient_id_match = re.search(r'patient\s*(\d+)', query_lower)
-            if patient_id_match:
-                patient_id = patient_id_match.group(1)
-                cases = await db.clinical_cases.find({
-                    "doctor_id": query_data.doctor_id,
-                    "patient_summary": {"$regex": patient_id, "$options": "i"}
-                }).to_list(10)
+            # Add specific information based on query type
+            if re.search(patterns['cbc'], query_lower) or re.search(patterns['lab'], query_lower):
+                # Look for lab-related files and results
+                lab_files = [f for f in case.get("uploaded_files", []) if "csv" in f.get("mime_type", "").lower() or "lab" in f.get("original_name", "").lower()]
+                case_info["lab_files"] = len(lab_files)
                 
-                response_text = f"Found {len(cases)} cases for patient {patient_id}"
+                if case.get("analysis_result") and case["analysis_result"].get("file_interpretations"):
+                    lab_interpretations = [fi for fi in case["analysis_result"]["file_interpretations"] 
+                                         if "lab" in fi.get("file_type", "").lower() or "cbc" in fi.get("clinical_significance", "").lower()]
+                    case_info["lab_findings"] = [li.get("clinical_significance", "")[:100] for li in lab_interpretations]
             
-        # General text search
+            elif re.search(patterns['xray'], query_lower) or re.search(patterns['ct_scan'], query_lower) or re.search(patterns['mri'], query_lower):
+                # Look for imaging files and results
+                image_files = [f for f in case.get("uploaded_files", []) if any(img_type in f.get("mime_type", "").lower() for img_type in ["image", "dicom"])]
+                case_info["image_files"] = len(image_files)
+                
+                if case.get("analysis_result") and case["analysis_result"].get("file_interpretations"):
+                    image_interpretations = [fi for fi in case["analysis_result"]["file_interpretations"] 
+                                           if "image" in fi.get("file_type", "").lower() or "radiolog" in fi.get("clinical_significance", "").lower()]
+                    case_info["imaging_findings"] = [ii.get("clinical_significance", "")[:100] for ii in image_interpretations]
+            
+            # Add analysis summary if available
+            if case.get("analysis_result"):
+                case_info["has_analysis"] = True
+                if re.search(patterns['summary'], query_lower):
+                    case_info["overall_assessment"] = case["analysis_result"].get("overall_assessment", "")[:200]
+                if re.search(patterns['analysis'], query_lower):
+                    case_info["differential_diagnoses"] = [dd.get("diagnosis", "") for dd in case["analysis_result"].get("differential_diagnoses", [])][:3]
+            else:
+                case_info["has_analysis"] = False
+            
+            filtered_results.append(case_info)
+        
+        # Generate response text based on findings
+        if len(filtered_results) == 1:
+            case = filtered_results[0]
+            response_text += f"Found 1 case for patient {case['patient_id']} ({case['patient_name']}) created on {case['created_at'][:10]}. "
+            
+            if 'lab_findings' in case and case['lab_findings']:
+                response_text += f"Lab findings: {'; '.join(case['lab_findings'])}. "
+            elif 'imaging_findings' in case and case['imaging_findings']:
+                response_text += f"Imaging findings: {'; '.join(case['imaging_findings'])}. "
+            elif case['has_analysis']:
+                response_text += f"Analysis available with confidence score {case['confidence_score']}%. "
+            
         else:
-            cases = await db.clinical_cases.find({
-                "doctor_id": query_data.doctor_id,
-                "$or": [
-                    {"patient_summary": {"$regex": query_lower, "$options": "i"}},
-                    {"analysis_result.overall_assessment": {"$regex": query_lower, "$options": "i"}},
-                    {"analysis_result.soap_note.subjective": {"$regex": query_lower, "$options": "i"}},
-                    {"analysis_result.soap_note.assessment": {"$regex": query_lower, "$options": "i"}}
-                ]
-            }).to_list(10)
+            response_text += f"Found {len(filtered_results)} cases matching your criteria. "
             
-            response_text = f"Found {len(cases)} matching cases for: {query_data.query}"
-        
-        if not cases:
-            return {"response": "No matching cases found for your query."}
-        
-        # Convert MongoDB documents to serializable format
-        serializable_cases = []
-        for case in cases:
-            # Convert ObjectId to string if present
-            if "_id" in case:
-                del case["_id"]  # Remove MongoDB ObjectId
+            # Summary statistics
+            total_with_analysis = sum(1 for c in filtered_results if c['has_analysis'])
+            total_files = sum(c['uploaded_files'] for c in filtered_results)
+            avg_confidence = sum(c['confidence_score'] for c in filtered_results if c['confidence_score'] > 0) / max(1, total_with_analysis)
             
-            # Convert datetime objects to ISO format strings
-            if "created_at" in case and hasattr(case["created_at"], "isoformat"):
-                case["created_at"] = case["created_at"].isoformat()
-            if "updated_at" in case and hasattr(case["updated_at"], "isoformat"):
-                case["updated_at"] = case["updated_at"].isoformat()
-                
-            # Convert file upload dates
-            for file_info in case.get("uploaded_files", []):
-                if "uploaded_at" in file_info and hasattr(file_info["uploaded_at"], "isoformat"):
-                    file_info["uploaded_at"] = file_info["uploaded_at"].isoformat()
-            
-            serializable_cases.append(case)
+            response_text += f"{total_with_analysis} cases have completed analysis, {total_files} total files uploaded, average confidence score: {avg_confidence:.1f}%. "
         
-        # Add case summaries to response
-        if serializable_cases:
-            response_text += ":\n"
-            for case in serializable_cases[:3]:  # Show top 3
-                case_date = case.get('created_at', 'Unknown date')
-                if isinstance(case_date, str):
-                    try:
-                        case_date = datetime.fromisoformat(case_date.replace('Z', '+00:00')).strftime('%Y-%m-%d')
-                    except:
-                        case_date = case_date[:10] if len(case_date) > 10 else case_date
-                        
-                response_text += f"- Case from {case_date}: {case['patient_summary'][:100]}...\n"
-        
-        return {"response": response_text, "cases": serializable_cases}
+        return {
+            "response": response_text.strip(),
+            "cases_found": len(filtered_results),
+            "cases": filtered_results,
+            "query_interpretation": {
+                "patient_id": patient_id,
+                "date_range": "yesterday" if "yesterday" in response_text else "today" if "today" in response_text else "all",
+                "query_type": "lab" if re.search(patterns['lab'], query_lower) else "imaging" if re.search(patterns['xray'], query_lower) else "general"
+            }
+        }
         
     except Exception as e:
-        logging.error(f"Query error: {str(e)}")
-        return {"response": f"Error processing query: {str(e)}"}
+        logging.error(f"Query processing error: {str(e)}")
+        return {
+            "response": f"Sorry, I encountered an error processing your query: {str(e)}. Please try rephrasing your request.",
+            "cases_found": 0,
+            "cases": []
+        }
 
 @api_router.post("/cases/{case_id}/feedback", response_model=CaseFeedback)
 async def submit_feedback(case_id: str, feedback_data: CaseFeedbackCreate):
