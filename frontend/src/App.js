@@ -576,7 +576,7 @@ const AppContent = () => {
             className="w-full"
             onClick={register}
             loading={loading}
-            disabled={!registerData.username || !registerData.password || !registerData.email || !registerData.full_name}
+            disabled={!registerData.username || !registerData.password || !registerData.email || !registerData.full_name || !registerData.doctor_id}
           >
             Create Account
           </Button>
