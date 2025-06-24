@@ -37,7 +37,7 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # Create the main app without a prefix
-app = FastAPI()
+app = FastAPI(title="Clinical Insight Assistant API", version="1.0.0")
 
 # Create uploads directory
 UPLOAD_DIR = ROOT_DIR / "uploads"
