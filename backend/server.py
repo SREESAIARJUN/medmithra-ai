@@ -446,6 +446,10 @@ async def create_case(case_data: ClinicalCaseCreate):
     
     # Save to database
     result = await db.clinical_cases.insert_one(case_obj.dict())
+    
+    # Log audit event
+    await log_audit_event(case_data.doctor_id, "case_created", case_obj.id, f"Created case with summary: {case_data.patient_summary[:100]}")
+    
     return case_obj
 
 @api_router.post("/cases/{case_id}/upload")
