@@ -160,7 +160,7 @@ async def analyze_individual_files(uploaded_files: List[Dict[str, Any]]) -> List
                     "clinical_significance": "detailed interpretation",
                     "recommendations": ["recommendation1", "recommendation2"]
                 }"""
-            ).with_model("gemini", "gemini-2.5-flash").with_max_tokens(4096)
+            ).with_model("gemini", "gemini-2.5-pro-preview-05-06").with_max_tokens(4096)
             
             # Analyze the individual file
             file_content = FileContentWithMimeType(
