@@ -465,6 +465,132 @@ async def query_cases(query_data: RetrievalQuery):
         logging.error(f"Query error: {str(e)}")
         return {"response": f"Error processing query: {str(e)}"}
 
+@api_router.post("/cases/{case_id}/feedback", response_model=CaseFeedback)
+async def submit_feedback(case_id: str, feedback_data: CaseFeedbackCreate):
+    """Submit feedback for a case analysis"""
+    try:
+        # Verify case exists
+        case = await db.clinical_cases.find_one({"id": case_id})
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+        
+        # Create feedback
+        feedback_dict = feedback_data.dict()
+        feedback_dict["case_id"] = case_id
+        feedback_obj = CaseFeedback(**feedback_dict)
+        
+        # Save to database
+        await db.case_feedback.insert_one(feedback_obj.dict())
+        
+        return feedback_obj
+        
+    except Exception as e:
+        logging.error(f"Feedback error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/feedback/stats")
+async def get_feedback_stats(doctor_id: str = "default_doctor"):
+    """Get feedback statistics for the dashboard"""
+    try:
+        # Count positive and negative feedback
+        positive_count = await db.case_feedback.count_documents({
+            "doctor_id": doctor_id,
+            "feedback_type": "positive"
+        })
+        
+        negative_count = await db.case_feedback.count_documents({
+            "doctor_id": doctor_id,
+            "feedback_type": "negative"
+        })
+        
+        total_feedback = positive_count + negative_count
+        satisfaction_rate = (positive_count / total_feedback * 100) if total_feedback > 0 else 0
+        
+        return {
+            "positive_feedback": positive_count,
+            "negative_feedback": negative_count,
+            "total_feedback": total_feedback,
+            "satisfaction_rate": round(satisfaction_rate, 2)
+        }
+        
+    except Exception as e:
+        logging.error(f"Feedback stats error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/cases/search")
+async def advanced_search(filters: SearchFilters):
+    """Advanced search and filtering for cases"""
+    try:
+        # Build MongoDB query
+        mongo_query = {"doctor_id": filters.doctor_id}
+        
+        # Date range filter
+        if filters.date_from or filters.date_to:
+            date_filter = {}
+            if filters.date_from:
+                from datetime import datetime
+                date_filter["$gte"] = datetime.fromisoformat(filters.date_from)
+            if filters.date_to:
+                from datetime import datetime
+                date_filter["$lte"] = datetime.fromisoformat(filters.date_to)
+            mongo_query["created_at"] = date_filter
+        
+        # Confidence score filter
+        if filters.confidence_min is not None:
+            mongo_query["confidence_score"] = {"$gte": filters.confidence_min}
+        
+        # Files filter
+        if filters.has_files is not None:
+            if filters.has_files:
+                mongo_query["uploaded_files"] = {"$ne": [], "$exists": True}
+            else:
+                mongo_query["$or"] = [
+                    {"uploaded_files": {"$size": 0}},
+                    {"uploaded_files": {"$exists": False}}
+                ]
+        
+        # Text search
+        if filters.search_text:
+            text_regex = {"$regex": filters.search_text, "$options": "i"}
+            mongo_query["$or"] = [
+                {"patient_summary": text_regex},
+                {"analysis_result.overall_assessment": text_regex},
+                {"analysis_result.soap_note.subjective": text_regex},
+                {"analysis_result.soap_note.assessment": text_regex}
+            ]
+        
+        # Execute search
+        cases = await db.clinical_cases.find(mongo_query).sort("created_at", -1).to_list(100)
+        
+        # Convert to serializable format
+        serializable_cases = []
+        for case in cases:
+            if "_id" in case:
+                del case["_id"]
+            
+            # Convert datetime objects
+            if "created_at" in case and hasattr(case["created_at"], "isoformat"):
+                case["created_at"] = case["created_at"].isoformat()
+            if "updated_at" in case and hasattr(case["updated_at"], "isoformat"):
+                case["updated_at"] = case["updated_at"].isoformat()
+                
+            # Convert file upload dates
+            for file_info in case.get("uploaded_files", []):
+                if "uploaded_at" in file_info and hasattr(file_info["uploaded_at"], "isoformat"):
+                    file_info["uploaded_at"] = file_info["uploaded_at"].isoformat()
+            
+            serializable_cases.append(case)
+        
+        return {
+            "cases": serializable_cases,
+            "total_found": len(serializable_cases),
+            "filters_applied": filters.dict()
+        }
+        
+    except Exception as e:
+        logging.error(f"Advanced search error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Include the router in the main app
 app.include_router(api_router)
 
