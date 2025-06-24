@@ -571,7 +571,7 @@ class ClinicalInsightAPITest(unittest.TestCase):
         
         # 4. Test logout
         print("\n4. Testing user logout")
-        response = requests.post(f"{API_URL}/auth/logout", json={"session_token": session_token})
+        response = requests.post(f"{API_URL}/auth/logout?session_token={session_token}")
         print(f"Logout response status: {response.status_code}")
         
         self.assertEqual(response.status_code, 200)
