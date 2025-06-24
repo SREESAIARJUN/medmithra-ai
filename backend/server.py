@@ -220,6 +220,48 @@ async def analyze_individual_files(uploaded_files: List[Dict[str, Any]]) -> List
             })
     
     return file_interpretations
+
+# Authentication Helper Functions
+import hashlib
+import secrets
+
+def hash_password(password: str) -> str:
+    """Hash password with salt"""
+    salt = secrets.token_hex(16)
+    password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+    return f"{salt}${password_hash.hex()}"
+
+def verify_password(password: str, password_hash: str) -> bool:
+    """Verify password against hash"""
+    try:
+        salt, hash_hex = password_hash.split('$')
+        password_check = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+        return password_check.hex() == hash_hex
+    except:
+        return False
+
+def create_session_token() -> str:
+    """Create a simple session token"""
+    return secrets.token_urlsafe(32)
+
+# Audit Trail Helper Functions
+async def log_audit_event(user_id: str, action: str, resource_id: Optional[str] = None, 
+                         details: Optional[str] = None, ip_address: Optional[str] = None):
+    """Log an audit event"""
+    try:
+        audit_log = AuditLog(
+            user_id=user_id,
+            action=action,
+            resource_id=resource_id,
+            details=details,
+            ip_address=ip_address
+        )
+        await db.audit_logs.insert_one(audit_log.dict())
+    except Exception as e:
+        logging.error(f"Failed to log audit event: {str(e)}")
+
+# Simple session storage (in production, use Redis or proper session management)
+active_sessions = {}
 async def save_uploaded_file(file: UploadFile) -> Dict[str, Any]:
     """Save uploaded file and return file info"""
     file_id = str(uuid.uuid4())
