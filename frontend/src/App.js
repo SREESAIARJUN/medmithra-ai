@@ -1060,9 +1060,22 @@ const AppContent = () => {
         {(searchResults ? searchResults.cases : cases).map((case_item, index) => (
           <Card key={case_item.id} className="p-6" style={{animationDelay: `${index * 0.1}s`}}>
             <div className="flex justify-between items-start mb-4">
-              <h4 className="font-semibold text-gray-900 dark:text-white">
-                Case {case_item.id.substring(0, 8)}
-              </h4>
+              <div>
+                <h4 className="font-semibold text-gray-900 dark:text-white">
+                  Case {case_item.id.substring(0, 8)}
+                </h4>
+                {case_item.patient_name && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Patient: {case_item.patient_name}
+                    {case_item.patient_id && ` (ID: ${case_item.patient_id})`}
+                  </p>
+                )}
+                {case_item.patient_age && case_item.patient_gender && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {case_item.patient_age} years old, {case_item.patient_gender}
+                  </p>
+                )}
+              </div>
               <Badge variant="secondary" size="sm">
                 {new Date(case_item.created_at).toLocaleDateString()}
               </Badge>
@@ -1087,21 +1100,26 @@ const AppContent = () => {
             </div>
             
             <div className="flex justify-between items-center">
-              <Button 
-                variant="primary"
-                size="sm"
-                onClick={() => viewCase(case_item.id)}
-              >
-                View Details
-              </Button>
-              {case_item.analysis_result && (
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {case_item.doctor_name && `Dr. ${case_item.doctor_name}`}
+              </div>
+              <div className="flex gap-2">
                 <Button 
-                  variant="secondary"
+                  variant="primary"
                   size="sm"
-                  onClick={() => exportToPDF(case_item.id)}
-                  icon={<Icons.Download />}
-                />
-              )}
+                  onClick={() => viewCase(case_item.id)}
+                >
+                  View Details
+                </Button>
+                {case_item.analysis_result && (
+                  <Button 
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => exportToPDF(case_item.id)}
+                    icon={<Icons.Download />}
+                  />
+                )}
+              </div>
             </div>
           </Card>
         ))}
