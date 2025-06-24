@@ -72,6 +72,28 @@ class RetrievalQuery(BaseModel):
     query: str
     doctor_id: str = "default_doctor"
 
+
+class CaseFeedback(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    case_id: str
+    doctor_id: str
+    feedback_type: str  # "positive", "negative"
+    feedback_text: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class CaseFeedbackCreate(BaseModel):
+    case_id: str
+    doctor_id: str = "default_doctor"
+    feedback_type: str  # "positive", "negative"
+    feedback_text: Optional[str] = None
+
+class SearchFilters(BaseModel):
+    doctor_id: str = "default_doctor"
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    confidence_min: Optional[float] = None
+    has_files: Optional[bool] = None
+    search_text: Optional[str] = None
 # Helper Functions
 async def save_uploaded_file(file: UploadFile) -> Dict[str, Any]:
     """Save uploaded file and return file info"""
