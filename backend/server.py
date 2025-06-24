@@ -789,6 +789,63 @@ async def verify_session(session_token: str):
         logging.error(f"Session verification error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.put("/auth/profile")
+async def update_profile(profile_data: UserProfile, session_token: str):
+    """Update user profile"""
+    try:
+        # Verify session
+        if session_token not in active_sessions:
+            raise HTTPException(status_code=401, detail="Invalid or expired session")
+        
+        user_info = active_sessions[session_token]
+        user_id = user_info["user_id"]
+        
+        # Check if new doctor_id conflicts with existing users (if changed)
+        existing_user = await db.users.find_one({"id": user_id})
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        if existing_user.get("doctor_id") != profile_data.doctor_id:
+            doctor_id_exists = await db.users.find_one({
+                "doctor_id": profile_data.doctor_id,
+                "id": {"$ne": user_id}
+            })
+            if doctor_id_exists:
+                raise HTTPException(status_code=400, detail="Doctor ID already exists")
+        
+        # Update profile
+        update_data = profile_data.dict()
+        await db.users.update_one(
+            {"id": user_id},
+            {"$set": update_data}
+        )
+        
+        # Log audit event
+        await log_audit_event(user_id, "profile_updated", details="Profile information updated")
+        
+        # Get updated user data
+        updated_user = await db.users.find_one({"id": user_id})
+        
+        return {
+            "message": "Profile updated successfully",
+            "user": {
+                "id": updated_user["id"],
+                "username": updated_user["username"],
+                "full_name": updated_user["full_name"],
+                "email": updated_user["email"],
+                "doctor_id": updated_user.get("doctor_id", ""),
+                "specialty": updated_user.get("specialty", ""),
+                "license_number": updated_user.get("license_number", ""),
+                "hospital_affiliation": updated_user.get("hospital_affiliation", "")
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Profile update error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Audit Trail Endpoints
 @api_router.get("/audit/logs")
 async def get_audit_logs(user_id: Optional[str] = None, action: Optional[str] = None, limit: int = 100):
