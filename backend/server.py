@@ -478,6 +478,184 @@ async def upload_files(case_id: str, files: List[UploadFile] = File(...)):
         logging.error(f"File upload error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# Authentication Endpoints
+@api_router.post("/auth/register", response_model=User)
+async def register_user(user_data: UserCreate):
+    """Register a new user"""
+    try:
+        # Check if username already exists
+        existing_user = await db.users.find_one({"username": user_data.username})
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Username already exists")
+        
+        # Check if email already exists
+        existing_email = await db.users.find_one({"email": user_data.email})
+        if existing_email:
+            raise HTTPException(status_code=400, detail="Email already exists")
+        
+        # Create user
+        password_hash = hash_password(user_data.password)
+        user_dict = user_data.dict()
+        del user_dict["password"]  # Remove plain password
+        user_dict["password_hash"] = password_hash
+        
+        user_obj = User(**user_dict)
+        await db.users.insert_one(user_obj.dict())
+        
+        # Log audit event
+        await log_audit_event(user_obj.id, "user_registered", details=f"User {user_data.username} registered")
+        
+        return user_obj
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Registration error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/auth/login")
+async def login_user(login_data: UserLogin):
+    """Login user and create session"""
+    try:
+        # Find user
+        user = await db.users.find_one({"username": login_data.username})
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid username or password")
+        
+        # Verify password
+        if not verify_password(login_data.password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid username or password")
+        
+        # Create session token
+        session_token = create_session_token()
+        active_sessions[session_token] = {
+            "user_id": user["id"],
+            "username": user["username"],
+            "created_at": datetime.utcnow()
+        }
+        
+        # Update last login
+        await db.users.update_one(
+            {"id": user["id"]},
+            {"$set": {"last_login": datetime.utcnow()}}
+        )
+        
+        # Log audit event
+        await log_audit_event(user["id"], "login", details=f"User {login_data.username} logged in")
+        
+        return {
+            "message": "Login successful",
+            "session_token": session_token,
+            "user": {
+                "id": user["id"],
+                "username": user["username"],
+                "full_name": user["full_name"],
+                "email": user["email"]
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Login error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/auth/logout")
+async def logout_user(session_token: str):
+    """Logout user and destroy session"""
+    try:
+        if session_token in active_sessions:
+            user_info = active_sessions[session_token]
+            del active_sessions[session_token]
+            
+            # Log audit event
+            await log_audit_event(user_info["user_id"], "logout", details=f"User {user_info['username']} logged out")
+            
+            return {"message": "Logout successful"}
+        else:
+            raise HTTPException(status_code=401, detail="Invalid session")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Logout error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/auth/verify")
+async def verify_session(session_token: str):
+    """Verify session token and return user info"""
+    try:
+        if session_token not in active_sessions:
+            raise HTTPException(status_code=401, detail="Invalid or expired session")
+        
+        user_info = active_sessions[session_token]
+        
+        # Get full user details
+        user = await db.users.find_one({"id": user_info["user_id"]})
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        return {
+            "valid": True,
+            "user": {
+                "id": user["id"],
+                "username": user["username"],
+                "full_name": user["full_name"],
+                "email": user["email"]
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Session verification error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Audit Trail Endpoints
+@api_router.get("/audit/logs")
+async def get_audit_logs(user_id: Optional[str] = None, action: Optional[str] = None, limit: int = 100):
+    """Get audit logs (admin functionality)"""
+    try:
+        query = {}
+        if user_id:
+            query["user_id"] = user_id
+        if action:
+            query["action"] = action
+        
+        logs = await db.audit_logs.find(query).sort("timestamp", -1).limit(limit).to_list(limit)
+        
+        # Convert datetime objects for serialization
+        for log in logs:
+            if "_id" in log:
+                del log["_id"]
+            if "timestamp" in log and hasattr(log["timestamp"], "isoformat"):
+                log["timestamp"] = log["timestamp"].isoformat()
+        
+        return {"logs": logs, "total": len(logs)}
+        
+    except Exception as e:
+        logging.error(f"Audit logs error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/audit/user/{user_id}")
+async def get_user_audit_trail(user_id: str):
+    """Get audit trail for a specific user"""
+    try:
+        logs = await db.audit_logs.find({"user_id": user_id}).sort("timestamp", -1).to_list(100)
+        
+        # Convert datetime objects for serialization
+        for log in logs:
+            if "_id" in log:
+                del log["_id"]
+            if "timestamp" in log and hasattr(log["timestamp"], "isoformat"):
+                log["timestamp"] = log["timestamp"].isoformat()
+        
+        return {"user_id": user_id, "logs": logs, "total": len(logs)}
+        
+    except Exception as e:
+        logging.error(f"User audit trail error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.post("/cases/{case_id}/analyze")
 async def analyze_case(case_id: str):
     """Analyze a clinical case with uploaded files"""
