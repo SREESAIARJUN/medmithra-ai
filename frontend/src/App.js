@@ -1,15 +1,27 @@
-import React, { useState, useEffect, useRef } from "react";
-import "./App.css";
-import axios from "axios";
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import './App.css';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { 
+  Button, 
+  Card, 
+  Input, 
+  Textarea, 
+  Badge, 
+  ProgressBar, 
+  LoadingSpinner, 
+  ThemeToggle, 
+  CollapsibleSection, 
+  Icons 
+} from './components/UIComponents';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+const API = process.env.REACT_APP_BACKEND_URL || '';
 
 // Speech Recognition Hook
 const useSpeechRecognition = () => {
-  const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const recognitionRef = useRef(null);
+  const [isListening, setIsListening] = useState(false);
+  const [recognition, setRecognition] = useState(null);
 
   useEffect(() => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -18,14 +30,12 @@ const useSpeechRecognition = () => {
     }
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognitionRef.current = new SpeechRecognition();
-    
-    const recognition = recognitionRef.current;
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    const rec = new SpeechRecognition();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-US';
 
-    recognition.onresult = (event) => {
+    rec.onresult = (event) => {
       let finalTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
@@ -33,35 +43,33 @@ const useSpeechRecognition = () => {
         }
       }
       if (finalTranscript) {
-        setTranscript(prev => prev + finalTranscript);
+        setTranscript(finalTranscript);
       }
     };
 
-    recognition.onerror = (event) => {
+    rec.onerror = (event) => {
       console.error('Speech recognition error:', event.error);
       setIsListening(false);
     };
 
-    recognition.onend = () => {
+    rec.onend = () => {
       setIsListening(false);
     };
 
-    return () => {
-      recognition.stop();
-    };
+    setRecognition(rec);
   }, []);
 
   const startListening = () => {
-    if (recognitionRef.current && !isListening) {
-      recognitionRef.current.start();
+    if (recognition) {
       setIsListening(true);
+      recognition.start();
     }
   };
 
   const stopListening = () => {
-    if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop();
+    if (recognition) {
       setIsListening(false);
+      recognition.stop();
     }
   };
 
@@ -69,50 +77,37 @@ const useSpeechRecognition = () => {
     setTranscript('');
   };
 
+  const hasRecognitionSupport = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
   return {
     transcript,
     isListening,
     startListening,
     stopListening,
     resetTranscript,
-    hasRecognitionSupport: !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+    hasRecognitionSupport
   };
 };
 
-// Collapsible Component
-const CollapsibleSection = ({ title, children, defaultOpen = false }) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
-  return (
-    <div className="collapsible-section">
-      <button 
-        className="collapsible-header"
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <span>{title}</span>
-        <span className={`collapsible-icon ${isOpen ? 'open' : ''}`}>▼</span>
-      </button>
-      {isOpen && (
-        <div className="collapsible-content">
-          {children}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const App = () => {
-  const [currentView, setCurrentView] = useState('login');
+// Main App Component
+const AppContent = () => {
+  const { isDark, toggleTheme } = useTheme();
+  
+  // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [sessionToken, setSessionToken] = useState(localStorage.getItem('sessionToken'));
   
+  // UI state
+  const [currentView, setCurrentView] = useState('home');
+  const [loading, setLoading] = useState(false);
+  
+  // Data state
   const [cases, setCases] = useState([]);
   const [selectedCase, setSelectedCase] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [feedbackStats, setFeedbackStats] = useState(null);
   
-  // Authentication state
+  // Auth forms state
   const [loginData, setLoginData] = useState({ username: '', password: '' });
   const [registerData, setRegisterData] = useState({ 
     username: '', 
@@ -181,7 +176,7 @@ const App = () => {
     }
 
     try {
-      const response = await axios.get(`${API}/auth/verify?session_token=${sessionToken}`);
+      const response = await axios.get(`${API}/api/auth/verify?session_token=${sessionToken}`);
       if (response.data.valid) {
         setIsAuthenticated(true);
         setCurrentUser(response.data.user);
@@ -197,7 +192,7 @@ const App = () => {
   const login = async () => {
     setLoading(true);
     try {
-      const response = await axios.post(`${API}/auth/login`, loginData);
+      const response = await axios.post(`${API}/api/auth/login`, loginData);
       const { session_token, user } = response.data;
       
       setSessionToken(session_token);
@@ -217,7 +212,7 @@ const App = () => {
   const register = async () => {
     setLoading(true);
     try {
-      await axios.post(`${API}/auth/register`, registerData);
+      await axios.post(`${API}/api/auth/register`, registerData);
       alert('Registration successful! Please login.');
       setCurrentView('login');
       setRegisterData({ username: '', email: '', password: '', full_name: '' });
@@ -233,7 +228,7 @@ const App = () => {
   const logout = async () => {
     try {
       if (sessionToken) {
-        await axios.post(`${API}/auth/logout?session_token=${sessionToken}`);
+        await axios.post(`${API}/api/auth/logout?session_token=${sessionToken}`);
       }
     } catch (error) {
       console.error('Logout error:', error);
@@ -249,7 +244,7 @@ const App = () => {
   const loadCases = async () => {
     if (!currentUser) return;
     try {
-      const response = await axios.get(`${API}/cases?doctor_id=${currentUser.id}`);
+      const response = await axios.get(`${API}/api/cases?doctor_id=${currentUser.id}`);
       setCases(response.data);
     } catch (error) {
       console.error('Error loading cases:', error);
@@ -259,7 +254,7 @@ const App = () => {
   const loadFeedbackStats = async () => {
     if (!currentUser) return;
     try {
-      const response = await axios.get(`${API}/feedback/stats?doctor_id=${currentUser.id}`);
+      const response = await axios.get(`${API}/api/feedback/stats?doctor_id=${currentUser.id}`);
       setFeedbackStats(response.data);
     } catch (error) {
       console.error('Error loading feedback stats:', error);
@@ -275,7 +270,7 @@ const App = () => {
     setLoading(true);
     try {
       // Create case
-      const caseResponse = await axios.post(`${API}/cases`, {
+      const caseResponse = await axios.post(`${API}/api/cases`, {
         patient_summary: patientSummary,
         doctor_id: currentUser.id
       });
@@ -289,7 +284,7 @@ const App = () => {
           formData.append('files', file);
         });
         
-        await axios.post(`${API}/cases/${caseId}/upload`, formData, {
+        await axios.post(`${API}/api/cases/${caseId}/upload`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -297,7 +292,7 @@ const App = () => {
       }
       
       // Analyze case
-      const analysisResponse = await axios.post(`${API}/cases/${caseId}/analyze`);
+      const analysisResponse = await axios.post(`${API}/api/cases/${caseId}/analyze`);
       setAnalysisResult({...analysisResponse.data, case_id: caseId});
       
       // Reset form
@@ -317,7 +312,7 @@ const App = () => {
 
   const submitFeedback = async (caseId, feedbackType, feedbackText = '') => {
     try {
-      await axios.post(`${API}/cases/${caseId}/feedback`, {
+      await axios.post(`${API}/api/cases/${caseId}/feedback`, {
         case_id: caseId,
         doctor_id: currentUser.id,
         feedback_type: feedbackType,
@@ -336,7 +331,7 @@ const App = () => {
 
   const exportToPDF = async (caseId) => {
     try {
-      const response = await axios.get(`${API}/cases/${caseId}/export-pdf`, {
+      const response = await axios.get(`${API}/api/cases/${caseId}/export-pdf`, {
         responseType: 'blob'
       });
       
@@ -366,7 +361,7 @@ const App = () => {
     
     setLoading(true);
     try {
-      const response = await axios.post(`${API}/query`, {
+      const response = await axios.post(`${API}/api/query`, {
         query: query,
         doctor_id: currentUser.id
       });
@@ -394,7 +389,7 @@ const App = () => {
         }
       });
       
-      const response = await axios.post(`${API}/cases/search`, filters);
+      const response = await axios.post(`${API}/api/cases/search`, filters);
       setSearchResults(response.data);
     } catch (error) {
       console.error('Error in advanced search:', error);
@@ -406,7 +401,7 @@ const App = () => {
 
   const viewCase = async (caseId) => {
     try {
-      const response = await axios.get(`${API}/cases/${caseId}`);
+      const response = await axios.get(`${API}/api/cases/${caseId}`);
       setSelectedCase(response.data);
       setCurrentView('case-detail');
     } catch (error) {
@@ -415,348 +410,418 @@ const App = () => {
   };
 
   const renderLogin = () => (
-    <div className="auth-container">
-      <div className="auth-form">
-        <h2>Login to Clinical Insight Assistant</h2>
-        <div className="form-group">
-          <label>Username</label>
-          <input
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800 animate-fade-in">
+      <Card className="w-full max-w-md p-8 m-4">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center mb-4">
+            <div className="p-3 bg-gradient-to-r from-medical-500 to-medical-600 rounded-full">
+              <Icons.Medical />
+            </div>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Clinical Insight Assistant
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            Sign in to your medical dashboard
+          </p>
+        </div>
+        
+        <div className="space-y-6">
+          <Input
+            label="Username"
             type="text"
             value={loginData.username}
             onChange={(e) => setLoginData({...loginData, username: e.target.value})}
             placeholder="Enter your username"
           />
-        </div>
-        <div className="form-group">
-          <label>Password</label>
-          <input
+          
+          <Input
+            label="Password"
             type="password"
             value={loginData.password}
             onChange={(e) => setLoginData({...loginData, password: e.target.value})}
             placeholder="Enter your password"
           />
+          
+          <Button
+            variant="primary"
+            size="lg"
+            className="w-full"
+            onClick={login}
+            loading={loading}
+            disabled={!loginData.username || !loginData.password}
+          >
+            Sign In
+          </Button>
+          
+          <div className="text-center">
+            <p className="text-gray-600 dark:text-gray-400">
+              Don't have an account?{' '}
+              <button 
+                onClick={() => setCurrentView('register')}
+                className="text-primary-600 dark:text-primary-400 hover:text-primary-500 font-medium transition-colors"
+              >
+                Register here
+              </button>
+            </p>
+          </div>
         </div>
-        <button 
-          className="auth-button"
-          onClick={login}
-          disabled={loading || !loginData.username || !loginData.password}
-        >
-          {loading ? 'Logging in...' : 'Login'}
-        </button>
-        <p className="auth-switch">
-          Don't have an account? 
-          <button onClick={() => setCurrentView('register')}>Register</button>
-        </p>
-      </div>
+      </Card>
     </div>
   );
 
   const renderRegister = () => (
-    <div className="auth-container">
-      <div className="auth-form">
-        <h2>Register for Clinical Insight Assistant</h2>
-        <div className="form-group">
-          <label>Full Name</label>
-          <input
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800 animate-fade-in">
+      <Card className="w-full max-w-md p-8 m-4">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center mb-4">
+            <div className="p-3 bg-gradient-to-r from-medical-500 to-medical-600 rounded-full">
+              <Icons.Medical />
+            </div>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Create Account
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            Join our medical platform
+          </p>
+        </div>
+        
+        <div className="space-y-6">
+          <Input
+            label="Full Name"
             type="text"
             value={registerData.full_name}
             onChange={(e) => setRegisterData({...registerData, full_name: e.target.value})}
             placeholder="Enter your full name"
           />
-        </div>
-        <div className="form-group">
-          <label>Username</label>
-          <input
+          
+          <Input
+            label="Username"
             type="text"
             value={registerData.username}
             onChange={(e) => setRegisterData({...registerData, username: e.target.value})}
             placeholder="Choose a username"
           />
-        </div>
-        <div className="form-group">
-          <label>Email</label>
-          <input
+          
+          <Input
+            label="Email"
             type="email"
             value={registerData.email}
             onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
             placeholder="Enter your email"
           />
-        </div>
-        <div className="form-group">
-          <label>Password</label>
-          <input
+          
+          <Input
+            label="Password"
             type="password"
             value={registerData.password}
             onChange={(e) => setRegisterData({...registerData, password: e.target.value})}
             placeholder="Choose a password"
           />
+          
+          <Button
+            variant="primary"
+            size="lg"
+            className="w-full"
+            onClick={register}
+            loading={loading}
+            disabled={!registerData.username || !registerData.password || !registerData.email || !registerData.full_name}
+          >
+            Create Account
+          </Button>
+          
+          <div className="text-center">
+            <p className="text-gray-600 dark:text-gray-400">
+              Already have an account?{' '}
+              <button 
+                onClick={() => setCurrentView('login')}
+                className="text-primary-600 dark:text-primary-400 hover:text-primary-500 font-medium transition-colors"
+              >
+                Sign in here
+              </button>
+            </p>
+          </div>
         </div>
-        <button 
-          className="auth-button"
-          onClick={register}
-          disabled={loading || !registerData.username || !registerData.password || !registerData.email || !registerData.full_name}
-        >
-          {loading ? 'Registering...' : 'Register'}
-        </button>
-        <p className="auth-switch">
-          Already have an account? 
-          <button onClick={() => setCurrentView('login')}>Login</button>
-        </p>
-      </div>
+      </Card>
     </div>
   );
 
   const renderHome = () => (
-    <div className="home-container">
-      <div className="hero-section">
-        <div className="hero-content">
-          <h1 className="hero-title">
+    <div className="animate-fade-in">
+      {/* Hero Section */}
+      <div className="hero-gradient rounded-2xl p-8 md:p-12 text-white mb-8 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent"></div>
+        <div className="relative z-10 text-center">
+          <h1 className="text-4xl md:text-6xl font-bold mb-4 animate-slide-up">
             Welcome, Dr. {currentUser?.full_name || currentUser?.username}
           </h1>
-          <p className="hero-subtitle">
+          <p className="text-xl md:text-2xl mb-8 opacity-90 animate-slide-up" style={{animationDelay: '0.1s'}}>
             AI-powered multimodal analysis for comprehensive patient care
           </p>
-          <div className="hero-buttons">
-            <button 
-              className="primary-button"
+          <div className="flex flex-col sm:flex-row gap-4 justify-center animate-slide-up" style={{animationDelay: '0.2s'}}>
+            <Button 
+              variant="primary" 
+              size="lg"
               onClick={() => setCurrentView('new-case')}
+              icon={<Icons.Plus />}
+              className="bg-white/10 hover:bg-white/20 border-white/20"
             >
               New Case Analysis
-            </button>
-            <button 
-              className="secondary-button"
+            </Button>
+            <Button 
+              variant="secondary" 
+              size="lg"
               onClick={() => setCurrentView('cases')}
+              icon={<Icons.Cases />}
+              className="bg-white/10 hover:bg-white/20 border-white/20"
             >
               View Cases
-            </button>
+            </Button>
           </div>
         </div>
       </div>
       
+      {/* Performance Dashboard */}
       {feedbackStats && (
-        <div className="stats-section">
-          <h2 className="section-title">Performance Dashboard</h2>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-number">{feedbackStats.total_feedback}</div>
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-6 text-center">
+            Performance Dashboard
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="stat-card">
+              <div className="stat-number text-primary-600">{feedbackStats.total_feedback}</div>
               <div className="stat-label">Total Feedback</div>
-            </div>
-            <div className="stat-card positive">
-              <div className="stat-number">{feedbackStats.positive_feedback}</div>
+            </Card>
+            <Card className="stat-card border-l-4 border-success-500">
+              <div className="stat-number text-success-600">{feedbackStats.positive_feedback}</div>
               <div className="stat-label">Positive Reviews</div>
-            </div>
-            <div className="stat-card negative">
-              <div className="stat-number">{feedbackStats.negative_feedback}</div>
+            </Card>
+            <Card className="stat-card border-l-4 border-error-500">
+              <div className="stat-number text-error-600">{feedbackStats.negative_feedback}</div>
               <div className="stat-label">Negative Reviews</div>
-            </div>
-            <div className="stat-card satisfaction">
-              <div className="stat-number">{feedbackStats.satisfaction_rate}%</div>
+            </Card>
+            <Card className="stat-card border-l-4 border-warning-500">
+              <div className="stat-number text-warning-600">{feedbackStats.satisfaction_rate}%</div>
               <div className="stat-label">Satisfaction Rate</div>
-            </div>
+            </Card>
           </div>
         </div>
       )}
       
-      <div className="features-section">
-        <h2 className="section-title">Features</h2>
-        <div className="features-grid">
-          <div className="feature-card">
-            <div className="feature-icon">📋</div>
-            <h3>SOAP Notes</h3>
-            <p>Automatically generate structured clinical documentation</p>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon">🔬</div>
-            <h3>Lab Analysis</h3>
-            <p>Interpret lab reports and medical data with AI precision</p>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon">📱</div>
-            <h3>Medical Imaging</h3>
-            <p>Analyze X-rays, CT scans, and other medical images</p>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon">🧠</div>
-            <h3>AI Diagnosis</h3>
-            <p>Get differential diagnoses with confidence scores</p>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon">🎤</div>
-            <h3>Voice Dictation</h3>
-            <p>Use speech-to-text for hands-free case entry</p>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon">📊</div>
-            <h3>Feedback Analytics</h3>
-            <p>Track AI performance and improve over time</p>
-          </div>
+      {/* Features Section */}
+      <div>
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-8 text-center">
+          Platform Features
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[
+            { icon: '📋', title: 'SOAP Notes', desc: 'Automatically generate structured clinical documentation' },
+            { icon: '🔬', title: 'Lab Analysis', desc: 'Interpret lab reports and medical data with AI precision' },
+            { icon: '🏥', title: 'Medical Imaging', desc: 'Analyze X-rays, CT scans, and other medical images' },
+            { icon: '🧠', title: 'AI Diagnosis', desc: 'Get differential diagnoses with confidence scores' },
+            { icon: '🎤', title: 'Voice Dictation', desc: 'Use speech-to-text for hands-free case entry' },
+            { icon: '📊', title: 'Analytics', desc: 'Track AI performance and improve over time' }
+          ].map((feature, index) => (
+            <Card key={index} className="p-6 text-center hover:scale-105 transition-transform duration-300" style={{animationDelay: `${index * 0.1}s`}}>
+              <div className="text-4xl mb-4">{feature.icon}</div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">{feature.title}</h3>
+              <p className="text-gray-600 dark:text-gray-400">{feature.desc}</p>
+            </Card>
+          ))}
         </div>
       </div>
     </div>
   );
 
   const renderNewCase = () => (
-    <div className="new-case-container">
-      <div className="form-header">
-        <h2>New Case Analysis</h2>
-        <button 
-          className="back-button"
+    <div className="max-w-4xl mx-auto animate-fade-in">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-8">
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-0">
+          New Case Analysis
+        </h2>
+        <Button 
+          variant="secondary"
           onClick={() => setCurrentView('home')}
+          icon={<Icons.ArrowLeft />}
         >
-          ← Back
-        </button>
+          Back
+        </Button>
       </div>
       
-      <div className="case-form">
-        <div className="form-group">
-          <label>Patient Case Summary</label>
-          <div className="textarea-container">
-            <textarea
-              value={patientSummary}
-              onChange={(e) => setPatientSummary(e.target.value)}
-              placeholder="Enter patient history, symptoms, and clinical observations..."
-              rows="6"
+      <Card className="p-8 mb-8">
+        <div className="space-y-6">
+          <div>
+            <label className="form-label">Patient Case Summary</label>
+            <div className="relative">
+              <Textarea
+                value={patientSummary}
+                onChange={(e) => setPatientSummary(e.target.value)}
+                placeholder="Enter patient history, symptoms, and clinical observations..."
+                rows="6"
+                className="pr-20"
+              />
+              {hasRecognitionSupport && (
+                <div className="absolute top-3 right-3 flex items-center gap-2">
+                  <Button
+                    variant={isListening ? 'error' : 'primary'}
+                    size="sm"
+                    onClick={isListening ? stopListening : startListening}
+                    icon={<Icons.Microphone />}
+                    className={isListening ? 'recording-pulse' : ''}
+                  >
+                    {isListening ? 'Stop' : 'Dictate'}
+                  </Button>
+                  {isListening && (
+                    <Badge variant="error" className="animate-pulse">
+                      Listening...
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div>
+            <label className="form-label">Upload Medical Files</label>
+            <input
+              type="file"
+              multiple
+              onChange={handleFileChange}
+              accept=".pdf,.csv,.jpg,.jpeg,.png,.dcm"
+              className="input cursor-pointer"
             />
-            {hasRecognitionSupport && (
-              <div className="speech-controls">
-                <button
-                  type="button"
-                  className={`speech-button ${isListening ? 'listening' : ''}`}
-                  onClick={isListening ? stopListening : startListening}
-                  title={isListening ? 'Stop dictation' : 'Start dictation'}
-                >
-                  🎤 {isListening ? 'Stop' : 'Dictate'}
-                </button>
-                {isListening && <span className="listening-indicator">Listening...</span>}
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              Supported: Lab reports (CSV, PDF), Medical images (JPG, PNG, DICOM)
+            </p>
+            {selectedFiles.length > 0 && (
+              <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Selected Files:</h4>
+                <div className="space-y-2">
+                  {selectedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-white dark:bg-gray-600 rounded">
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{file.name}</span>
+                      <Badge variant="secondary">{(file.size / 1024).toFixed(1)} KB</Badge>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
+          
+          <Button 
+            variant="success"
+            size="lg"
+            className="w-full"
+            onClick={createCase}
+            loading={loading}
+            disabled={!patientSummary.trim()}
+            icon={<Icons.Analysis />}
+          >
+            {loading ? 'Analyzing...' : 'Analyze Case'}
+          </Button>
         </div>
-        
-        <div className="form-group">
-          <label>Upload Medical Files</label>
-          <input
-            type="file"
-            multiple
-            onChange={handleFileChange}
-            accept=".pdf,.csv,.jpg,.jpeg,.png,.dcm"
-          />
-          <p className="file-info">
-            Supported: Lab reports (CSV, PDF), Medical images (JPG, PNG, DICOM)
-          </p>
-          {selectedFiles.length > 0 && (
-            <div className="selected-files">
-              <h4>Selected Files:</h4>
-              {selectedFiles.map((file, index) => (
-                <div key={index} className="file-item">
-                  {file.name} ({(file.size / 1024).toFixed(1)} KB)
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        
-        <button 
-          className="analyze-button"
-          onClick={createCase}
-          disabled={loading || !patientSummary.trim()}
-        >
-          {loading ? 'Analyzing...' : 'Analyze Case'}
-        </button>
-      </div>
+      </Card>
       
       {analysisResult && (
-        <div className="analysis-results">
-          <div className="analysis-header">
-            <h3>Clinical Analysis Results</h3>
-            <div className="action-buttons">
-              <div className="feedback-buttons">
-                <button 
-                  className="feedback-positive"
-                  onClick={() => submitFeedback(analysisResult.case_id, 'positive')}
-                  title="Good analysis"
-                >
-                  👍 Good
-                </button>
-                <button 
-                  className="feedback-negative"
-                  onClick={() => submitFeedback(analysisResult.case_id, 'negative')}
-                  title="Poor analysis"
-                >
-                  👎 Poor
-                </button>
-              </div>
-              <button 
-                className="export-button"
-                onClick={() => exportToPDF(analysisResult.case_id)}
-                title="Export to PDF"
+        <div className="space-y-6 animate-slide-up">
+          <div className="flex flex-col sm:flex-row justify-between items-center">
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Clinical Analysis Results</h3>
+            <div className="flex items-center gap-2 mt-4 sm:mt-0">
+              <Button 
+                variant="success"
+                size="sm"
+                onClick={() => submitFeedback(analysisResult.case_id, 'positive')}
+                icon={<Icons.ThumbsUp />}
               >
-                📄 Export PDF
-              </button>
+                Good
+              </Button>
+              <Button 
+                variant="error"
+                size="sm"
+                onClick={() => submitFeedback(analysisResult.case_id, 'negative')}
+                icon={<Icons.ThumbsDown />}
+              >
+                Poor
+              </Button>
+              <Button 
+                variant="secondary"
+                size="sm"
+                onClick={() => exportToPDF(analysisResult.case_id)}
+                icon={<Icons.Download />}
+              >
+                Export PDF
+              </Button>
             </div>
           </div>
           
           <CollapsibleSection title="Confidence Score" defaultOpen={true}>
-            <div className="confidence-score">
-              <h4>Confidence Score: {analysisResult.confidence_score}%</h4>
-              <div className="confidence-bar">
-                <div 
-                  className="confidence-fill"
-                  style={{width: `${analysisResult.confidence_score}%`}}
-                />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Confidence Score: {analysisResult.confidence_score}%
+                </h4>
+                <Badge 
+                  variant={analysisResult.confidence_score >= 80 ? 'success' : analysisResult.confidence_score >= 60 ? 'warning' : 'error'}
+                  size="lg"
+                >
+                  {analysisResult.confidence_score >= 80 ? 'High' : analysisResult.confidence_score >= 60 ? 'Medium' : 'Low'} Confidence
+                </Badge>
               </div>
+              <ProgressBar 
+                value={analysisResult.confidence_score} 
+                color={analysisResult.confidence_score >= 80 ? 'success' : analysisResult.confidence_score >= 60 ? 'warning' : 'error'}
+              />
             </div>
           </CollapsibleSection>
           
           <CollapsibleSection title="SOAP Notes" defaultOpen={true}>
-            <div className="soap-grid">
-              <div className="soap-item">
-                <h5>Subjective</h5>
-                <p>{analysisResult.soap_note.subjective}</p>
-              </div>
-              <div className="soap-item">
-                <h5>Objective</h5>
-                <p>{analysisResult.soap_note.objective}</p>
-              </div>
-              <div className="soap-item">
-                <h5>Assessment</h5>
-                <p>{analysisResult.soap_note.assessment}</p>
-              </div>
-              <div className="soap-item">
-                <h5>Plan</h5>
-                <p>{analysisResult.soap_note.plan}</p>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.entries(analysisResult.soap_note).map(([key, value]) => (
+                <div key={key} className="soap-card">
+                  <h5 className="font-semibold text-gray-900 dark:text-white capitalize mb-2">{key}</h5>
+                  <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{value}</p>
+                </div>
+              ))}
             </div>
           </CollapsibleSection>
           
           <CollapsibleSection title="Differential Diagnoses" defaultOpen={true}>
-            {analysisResult.differential_diagnoses.map((diagnosis, index) => (
-              <div key={index} className="diagnosis-item">
-                <div className="diagnosis-header">
-                  <span className="diagnosis-name">{diagnosis.diagnosis}</span>
-                  <span className="diagnosis-likelihood">{diagnosis.likelihood}%</span>
+            <div className="space-y-4">
+              {analysisResult.differential_diagnoses.map((diagnosis, index) => (
+                <div key={index} className="diagnosis-card">
+                  <div className="flex justify-between items-start mb-2">
+                    <h5 className="font-semibold text-gray-900 dark:text-white">{diagnosis.diagnosis}</h5>
+                    <Badge variant="warning" size="lg">{diagnosis.likelihood}%</Badge>
+                  </div>
+                  <p className="text-gray-700 dark:text-gray-300">{diagnosis.rationale}</p>
                 </div>
-                <p className="diagnosis-rationale">{diagnosis.rationale}</p>
-              </div>
-            ))}
+              ))}
+            </div>
           </CollapsibleSection>
           
           <CollapsibleSection title="Recommendations & Investigations">
-            <div className="recommendations">
-              <div className="recommendation-section">
-                <h4>Treatment Recommendations</h4>
-                <ul>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="recommendation-card">
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Treatment Recommendations</h4>
+                <ul className="space-y-2">
                   {analysisResult.treatment_recommendations.map((rec, index) => (
-                    <li key={index}>{rec}</li>
+                    <li key={index} className="flex items-start gap-2">
+                      <span className="text-success-500 mt-1">•</span>
+                      <span className="text-gray-700 dark:text-gray-300">{rec}</span>
+                    </li>
                   ))}
                 </ul>
               </div>
               
-              <div className="recommendation-section">
-                <h4>Investigation Suggestions</h4>
-                <ul>
+              <div className="recommendation-card">
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Investigation Suggestions</h4>
+                <ul className="space-y-2">
                   {analysisResult.investigation_suggestions.map((inv, index) => (
-                    <li key={index}>{inv}</li>
+                    <li key={index} className="flex items-start gap-2">
+                      <span className="text-medical-500 mt-1">•</span>
+                      <span className="text-gray-700 dark:text-gray-300">{inv}</span>
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -765,30 +830,35 @@ const App = () => {
 
           {analysisResult.file_interpretations && analysisResult.file_interpretations.length > 0 && (
             <CollapsibleSection title="Individual File Interpretations">
-              {analysisResult.file_interpretations.map((interpretation, index) => (
-                <div key={index} className="file-interpretation">
-                  <h5>📁 {interpretation.file_name}</h5>
-                  <div className="interpretation-details">
-                    <p><strong>Type:</strong> {interpretation.file_type}</p>
-                    {interpretation.key_findings && interpretation.key_findings.length > 0 && (
-                      <p><strong>Key Findings:</strong> {interpretation.key_findings.join(', ')}</p>
-                    )}
-                    {interpretation.abnormal_values && interpretation.abnormal_values.length > 0 && (
-                      <p><strong>Abnormal Values:</strong> {interpretation.abnormal_values.join(', ')}</p>
-                    )}
-                    <p><strong>Clinical Significance:</strong> {interpretation.clinical_significance}</p>
-                    {interpretation.recommendations && interpretation.recommendations.length > 0 && (
-                      <p><strong>Recommendations:</strong> {interpretation.recommendations.join(', ')}</p>
-                    )}
+              <div className="space-y-4">
+                {analysisResult.file_interpretations.map((interpretation, index) => (
+                  <div key={index} className="medical-card">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-2xl">📁</span>
+                      <h5 className="font-semibold text-gray-900 dark:text-white">{interpretation.file_name}</h5>
+                      <Badge variant="secondary">{interpretation.file_type}</Badge>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      {interpretation.key_findings && interpretation.key_findings.length > 0 && (
+                        <p><strong className="text-gray-900 dark:text-white">Key Findings:</strong> <span className="text-gray-700 dark:text-gray-300">{interpretation.key_findings.join(', ')}</span></p>
+                      )}
+                      {interpretation.abnormal_values && interpretation.abnormal_values.length > 0 && (
+                        <p><strong className="text-gray-900 dark:text-white">Abnormal Values:</strong> <span className="text-error-600">{interpretation.abnormal_values.join(', ')}</span></p>
+                      )}
+                      <p><strong className="text-gray-900 dark:text-white">Clinical Significance:</strong> <span className="text-gray-700 dark:text-gray-300">{interpretation.clinical_significance}</span></p>
+                      {interpretation.recommendations && interpretation.recommendations.length > 0 && (
+                        <p><strong className="text-gray-900 dark:text-white">Recommendations:</strong> <span className="text-gray-700 dark:text-gray-300">{interpretation.recommendations.join(', ')}</span></p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </CollapsibleSection>
           )}
           
           <CollapsibleSection title="Overall Assessment">
-            <div className="overall-assessment">
-              <p>{analysisResult.overall_assessment}</p>
+            <div className="medical-card">
+              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{analysisResult.overall_assessment}</p>
             </div>
           </CollapsibleSection>
         </div>
@@ -797,271 +867,297 @@ const App = () => {
   );
 
   const renderCases = () => (
-    <div className="cases-container">
-      <div className="cases-header">
-        <h2>Patient Cases</h2>
-        <button 
-          className="back-button"
+    <div className="max-w-6xl mx-auto animate-fade-in">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-8">
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-0">
+          Patient Cases
+        </h2>
+        <Button 
+          variant="secondary"
           onClick={() => setCurrentView('home')}
+          icon={<Icons.ArrowLeft />}
         >
-          ← Back
-        </button>
+          Back
+        </Button>
       </div>
       
-      <div className="query-section">
-        <div className="query-input">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ask about cases (e.g., 'Show yesterday's CBC results')"
-          />
-          <button onClick={handleQuery} disabled={loading}>
-            {loading ? 'Searching...' : 'Search'}
-          </button>
+      {/* Query Section */}
+      <Card className="p-6 mb-8">
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Ask about cases (e.g., 'Show yesterday's CBC results')"
+                className="w-full"
+              />
+            </div>
+            <Button 
+              variant="primary"
+              onClick={handleQuery} 
+              loading={loading}
+              icon={<Icons.Search />}
+            >
+              Search
+            </Button>
+          </div>
+          
+          {queryResult && (
+            <div className="mt-4 p-4 bg-primary-50 dark:bg-primary-900/20 border-l-4 border-primary-500 rounded">
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Search Results:</h4>
+              <p className="text-gray-700 dark:text-gray-300">{queryResult.response}</p>
+            </div>
+          )}
         </div>
-        
-        {queryResult && (
-          <div className="query-result">
-            <h4>Search Results:</h4>
-            <p>{queryResult.response}</p>
-          </div>
-        )}
-      </div>
+      </Card>
       
-      <div className="advanced-search">
-        <h3>Advanced Search & Filters</h3>
-        <div className="search-form">
-          <div className="search-row">
-            <div className="search-field">
-              <label>From Date</label>
-              <input
-                type="date"
-                value={searchFilters.date_from}
-                onChange={(e) => setSearchFilters({...searchFilters, date_from: e.target.value})}
-              />
-            </div>
-            <div className="search-field">
-              <label>To Date</label>
-              <input
-                type="date"
-                value={searchFilters.date_to}
-                onChange={(e) => setSearchFilters({...searchFilters, date_to: e.target.value})}
-              />
-            </div>
-            <div className="search-field">
-              <label>Min Confidence</label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={searchFilters.confidence_min}
-                onChange={(e) => setSearchFilters({...searchFilters, confidence_min: e.target.value})}
-                placeholder="0-100"
-              />
-            </div>
+      {/* Advanced Search */}
+      <Card className="p-6 mb-8">
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Advanced Search & Filters</h3>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Input
+              label="From Date"
+              type="date"
+              value={searchFilters.date_from}
+              onChange={(e) => setSearchFilters({...searchFilters, date_from: e.target.value})}
+            />
+            <Input
+              label="To Date"
+              type="date"
+              value={searchFilters.date_to}
+              onChange={(e) => setSearchFilters({...searchFilters, date_to: e.target.value})}
+            />
+            <Input
+              label="Min Confidence"
+              type="number"
+              min="0"
+              max="100"
+              value={searchFilters.confidence_min}
+              onChange={(e) => setSearchFilters({...searchFilters, confidence_min: e.target.value})}
+              placeholder="0-100"
+            />
           </div>
-          <div className="search-row">
-            <div className="search-field">
-              <label>Has Files</label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="form-group">
+              <label className="form-label">Has Files</label>
               <select
                 value={searchFilters.has_files}
                 onChange={(e) => setSearchFilters({...searchFilters, has_files: e.target.value})}
+                className="input"
               >
                 <option value="">Any</option>
                 <option value="true">With Files</option>
                 <option value="false">Without Files</option>
               </select>
             </div>
-            <div className="search-field">
-              <label>Search Text</label>
-              <input
-                type="text"
-                value={searchFilters.search_text}
-                onChange={(e) => setSearchFilters({...searchFilters, search_text: e.target.value})}
-                placeholder="Search in case summary..."
-              />
-            </div>
-            <div className="search-field">
-              <button 
-                className="search-button"
+            <Input
+              label="Search Text"
+              value={searchFilters.search_text}
+              onChange={(e) => setSearchFilters({...searchFilters, search_text: e.target.value})}
+              placeholder="Search in case summary..."
+            />
+            <div className="flex items-end">
+              <Button 
+                variant="primary"
                 onClick={handleAdvancedSearch}
-                disabled={loading}
+                loading={loading}
+                className="w-full"
+                icon={<Icons.Search />}
               >
-                {loading ? 'Searching...' : 'Search'}
-              </button>
+                Search
+              </Button>
             </div>
           </div>
         </div>
         
         {searchResults && (
-          <div className="search-results">
-            <h4>Found {searchResults.total_found} cases</h4>
+          <div className="mt-4 p-4 bg-success-50 dark:bg-success-900/20 border-l-4 border-success-500 rounded">
+            <h4 className="font-semibold text-gray-900 dark:text-white">Found {searchResults.total_found} cases</h4>
           </div>
         )}
-      </div>
+      </Card>
       
-      <div className="cases-grid">
-        {(searchResults ? searchResults.cases : cases).map((case_item) => (
-          <div key={case_item.id} className="case-card">
-            <div className="case-header">
-              <h4>Case {case_item.id.substring(0, 8)}</h4>
-              <span className="case-date">
+      {/* Cases Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {(searchResults ? searchResults.cases : cases).map((case_item, index) => (
+          <Card key={case_item.id} className="p-6" style={{animationDelay: `${index * 0.1}s`}}>
+            <div className="flex justify-between items-start mb-4">
+              <h4 className="font-semibold text-gray-900 dark:text-white">
+                Case {case_item.id.substring(0, 8)}
+              </h4>
+              <Badge variant="secondary" size="sm">
                 {new Date(case_item.created_at).toLocaleDateString()}
-              </span>
+              </Badge>
             </div>
-            <p className="case-summary">
-              {case_item.patient_summary.substring(0, 100)}...
+            
+            <p className="text-gray-600 dark:text-gray-400 mb-4 line-clamp-3">
+              {case_item.patient_summary.substring(0, 150)}...
             </p>
-            <div className="case-footer">
-              <span className="files-count">
-                {case_item.uploaded_files.length} files
-              </span>
-              {case_item.confidence_score && (
-                <span className="confidence">
-                  {case_item.confidence_score}% confidence
-                </span>
-              )}
-              <div className="case-actions">
-                <button 
-                  className="view-button"
-                  onClick={() => viewCase(case_item.id)}
-                >
-                  View Details
-                </button>
-                {case_item.analysis_result && (
-                  <button 
-                    className="export-button-small"
-                    onClick={() => exportToPDF(case_item.id)}
-                    title="Export to PDF"
+            
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                <span>{case_item.uploaded_files.length} files</span>
+                {case_item.confidence_score && (
+                  <Badge 
+                    variant={case_item.confidence_score >= 80 ? 'success' : case_item.confidence_score >= 60 ? 'warning' : 'error'}
+                    size="sm"
                   >
-                    📄
-                  </button>
+                    {case_item.confidence_score}%
+                  </Badge>
                 )}
               </div>
             </div>
-          </div>
+            
+            <div className="flex justify-between items-center">
+              <Button 
+                variant="primary"
+                size="sm"
+                onClick={() => viewCase(case_item.id)}
+              >
+                View Details
+              </Button>
+              {case_item.analysis_result && (
+                <Button 
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => exportToPDF(case_item.id)}
+                  icon={<Icons.Download />}
+                />
+              )}
+            </div>
+          </Card>
         ))}
       </div>
     </div>
   );
 
   const renderCaseDetail = () => (
-    <div className="case-detail-container">
-      <div className="case-detail-header">
-        <h2>Case Details</h2>
-        <div className="header-actions">
+    <div className="max-w-4xl mx-auto animate-fade-in">
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-8">
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-0">
+          Case Details
+        </h2>
+        <div className="flex gap-2">
           {selectedCase?.analysis_result && (
-            <button 
-              className="export-button"
+            <Button 
+              variant="secondary"
+              size="sm"
               onClick={() => exportToPDF(selectedCase.id)}
-              title="Export to PDF"
+              icon={<Icons.Download />}
             >
-              📄 Export PDF
-            </button>
+              Export PDF
+            </Button>
           )}
-          <button 
-            className="back-button"
+          <Button 
+            variant="secondary"
             onClick={() => setCurrentView('cases')}
+            icon={<Icons.ArrowLeft />}
           >
-            ← Back to Cases
-          </button>
+            Back to Cases
+          </Button>
         </div>
       </div>
       
       {selectedCase && (
-        <div className="case-detail">
-          <div className="case-info">
-            <h3>Patient Summary</h3>
-            <p>{selectedCase.patient_summary}</p>
+        <div className="space-y-6">
+          <Card className="p-6">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Patient Summary</h3>
+            <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-4">{selectedCase.patient_summary}</p>
             
-            <div className="case-meta">
+            <div className="flex gap-6 text-sm text-gray-500 dark:text-gray-400">
               <span>Created: {new Date(selectedCase.created_at).toLocaleString()}</span>
               <span>Files: {selectedCase.uploaded_files.length}</span>
             </div>
-          </div>
+          </Card>
           
           {selectedCase.analysis_result && (
-            <div className="analysis-results">
-              <div className="analysis-header">
-                <h3>Analysis Results</h3>
-                <div className="feedback-buttons">
-                  <button 
-                    className="feedback-positive"
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Analysis Results</h3>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="success"
+                    size="sm"
                     onClick={() => submitFeedback(selectedCase.id, 'positive')}
-                    title="Good analysis"
+                    icon={<Icons.ThumbsUp />}
                   >
-                    👍 Good
-                  </button>
-                  <button 
-                    className="feedback-negative"
+                    Good
+                  </Button>
+                  <Button 
+                    variant="error"
+                    size="sm"
                     onClick={() => submitFeedback(selectedCase.id, 'negative')}
-                    title="Poor analysis"
+                    icon={<Icons.ThumbsDown />}
                   >
-                    👎 Poor
-                  </button>
+                    Poor
+                  </Button>
                 </div>
               </div>
               
               <CollapsibleSection title="Confidence Score" defaultOpen={true}>
-                <div className="confidence-score">
-                  <h4>Confidence Score: {selectedCase.confidence_score}%</h4>
-                  <div className="confidence-bar">
-                    <div 
-                      className="confidence-fill"
-                      style={{width: `${selectedCase.confidence_score}%`}}
-                    />
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Confidence Score: {selectedCase.confidence_score}%
+                    </h4>
+                    <Badge 
+                      variant={selectedCase.confidence_score >= 80 ? 'success' : selectedCase.confidence_score >= 60 ? 'warning' : 'error'}
+                      size="lg"
+                    >
+                      {selectedCase.confidence_score >= 80 ? 'High' : selectedCase.confidence_score >= 60 ? 'Medium' : 'Low'} Confidence
+                    </Badge>
                   </div>
+                  <ProgressBar 
+                    value={selectedCase.confidence_score} 
+                    color={selectedCase.confidence_score >= 80 ? 'success' : selectedCase.confidence_score >= 60 ? 'warning' : 'error'}
+                  />
                 </div>
               </CollapsibleSection>
               
               <CollapsibleSection title="SOAP Notes" defaultOpen={true}>
-                <div className="soap-grid">
-                  <div className="soap-item">
-                    <h5>Subjective</h5>
-                    <p>{selectedCase.analysis_result.soap_note.subjective}</p>
-                  </div>
-                  <div className="soap-item">
-                    <h5>Objective</h5>
-                    <p>{selectedCase.analysis_result.soap_note.objective}</p>
-                  </div>
-                  <div className="soap-item">
-                    <h5>Assessment</h5>
-                    <p>{selectedCase.analysis_result.soap_note.assessment}</p>
-                  </div>
-                  <div className="soap-item">
-                    <h5>Plan</h5>
-                    <p>{selectedCase.analysis_result.soap_note.plan}</p>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Object.entries(selectedCase.analysis_result.soap_note).map(([key, value]) => (
+                    <div key={key} className="soap-card">
+                      <h5 className="font-semibold text-gray-900 dark:text-white capitalize mb-2">{key}</h5>
+                      <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{value}</p>
+                    </div>
+                  ))}
                 </div>
               </CollapsibleSection>
 
               {selectedCase.analysis_result.file_interpretations && selectedCase.analysis_result.file_interpretations.length > 0 && (
                 <CollapsibleSection title="Individual File Interpretations">
-                  {selectedCase.analysis_result.file_interpretations.map((interpretation, index) => (
-                    <div key={index} className="file-interpretation">
-                      <h5>📁 {interpretation.file_name}</h5>
-                      <div className="interpretation-details">
-                        <p><strong>Type:</strong> {interpretation.file_type}</p>
-                        {interpretation.key_findings && interpretation.key_findings.length > 0 && (
-                          <p><strong>Key Findings:</strong> {interpretation.key_findings.join(', ')}</p>
-                        )}
-                        {interpretation.abnormal_values && interpretation.abnormal_values.length > 0 && (
-                          <p><strong>Abnormal Values:</strong> {interpretation.abnormal_values.join(', ')}</p>
-                        )}
-                        <p><strong>Clinical Significance:</strong> {interpretation.clinical_significance}</p>
-                        {interpretation.recommendations && interpretation.recommendations.length > 0 && (
-                          <p><strong>Recommendations:</strong> {interpretation.recommendations.join(', ')}</p>
-                        )}
+                  <div className="space-y-4">
+                    {selectedCase.analysis_result.file_interpretations.map((interpretation, index) => (
+                      <div key={index} className="medical-card">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-2xl">📁</span>
+                          <h5 className="font-semibold text-gray-900 dark:text-white">{interpretation.file_name}</h5>
+                          <Badge variant="secondary">{interpretation.file_type}</Badge>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                          {interpretation.key_findings && interpretation.key_findings.length > 0 && (
+                            <p><strong className="text-gray-900 dark:text-white">Key Findings:</strong> <span className="text-gray-700 dark:text-gray-300">{interpretation.key_findings.join(', ')}</span></p>
+                          )}
+                          {interpretation.abnormal_values && interpretation.abnormal_values.length > 0 && (
+                            <p><strong className="text-gray-900 dark:text-white">Abnormal Values:</strong> <span className="text-error-600">{interpretation.abnormal_values.join(', ')}</span></p>
+                          )}
+                          <p><strong className="text-gray-900 dark:text-white">Clinical Significance:</strong> <span className="text-gray-700 dark:text-gray-300">{interpretation.clinical_significance}</span></p>
+                          {interpretation.recommendations && interpretation.recommendations.length > 0 && (
+                            <p><strong className="text-gray-900 dark:text-white">Recommendations:</strong> <span className="text-gray-700 dark:text-gray-300">{interpretation.recommendations.join(', ')}</span></p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </CollapsibleSection>
               )}
               
               <CollapsibleSection title="Overall Assessment">
-                <div className="overall-assessment">
-                  <p>{selectedCase.analysis_result.overall_assessment}</p>
+                <div className="medical-card">
+                  <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{selectedCase.analysis_result.overall_assessment}</p>
                 </div>
               </CollapsibleSection>
             </div>
@@ -1073,7 +1169,7 @@ const App = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="app">
+      <div className="min-h-screen">
         {currentView === 'login' && renderLogin()}
         {currentView === 'register' && renderRegister()}
       </div>
@@ -1081,44 +1177,96 @@ const App = () => {
   }
 
   return (
-    <div className="app">
-      <nav className="navbar">
-        <div className="nav-brand">
-          <h1>Clinical Insight Assistant</h1>
-        </div>
-        <div className="nav-links">
-          <button 
-            className={currentView === 'home' ? 'active' : ''}
-            onClick={() => setCurrentView('home')}
-          >
-            Home
-          </button>
-          <button 
-            className={currentView === 'new-case' ? 'active' : ''}
-            onClick={() => setCurrentView('new-case')}
-          >
-            New Case
-          </button>
-          <button 
-            className={currentView === 'cases' ? 'active' : ''}
-            onClick={() => setCurrentView('cases')}
-          >
-            Cases
-          </button>
-          <div className="user-menu">
-            <span>Dr. {currentUser?.full_name || currentUser?.username}</span>
-            <button className="logout-button" onClick={logout}>Logout</button>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+      {/* Navigation */}
+      <nav className="glass border-b sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-r from-medical-500 to-medical-600 rounded-lg">
+                  <Icons.Medical />
+                </div>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                  Clinical Insight Assistant
+                </h1>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              {/* Navigation Links */}
+              <div className="hidden md:flex items-center gap-2">
+                <Button
+                  variant={currentView === 'home' ? 'primary' : 'secondary'}
+                  size="sm"
+                  onClick={() => setCurrentView('home')}
+                  icon={<Icons.Home />}
+                >
+                  Home
+                </Button>
+                <Button
+                  variant={currentView === 'new-case' ? 'primary' : 'secondary'}
+                  size="sm"
+                  onClick={() => setCurrentView('new-case')}
+                  icon={<Icons.Plus />}
+                >
+                  New Case
+                </Button>
+                <Button
+                  variant={currentView === 'cases' ? 'primary' : 'secondary'}
+                  size="sm"
+                  onClick={() => setCurrentView('cases')}
+                  icon={<Icons.Cases />}
+                >
+                  Cases
+                </Button>
+              </div>
+              
+              {/* Theme Toggle */}
+              <ThemeToggle 
+                isDark={isDark} 
+                toggle={toggleTheme}
+                className="hidden sm:flex"
+              />
+              
+              {/* User Menu */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Icons.User />
+                  <span className="hidden sm:block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Dr. {currentUser?.full_name || currentUser?.username}
+                  </span>
+                </div>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={logout}
+                >
+                  Logout
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </nav>
 
-      <main className="main-content">
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {currentView === 'home' && renderHome()}
         {currentView === 'new-case' && renderNewCase()}
         {currentView === 'cases' && renderCases()}
         {currentView === 'case-detail' && renderCaseDetail()}
       </main>
     </div>
+  );
+};
+
+// Main App with Theme Provider
+const App = () => {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 };
 
