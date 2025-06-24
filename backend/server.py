@@ -135,6 +135,10 @@ class UserCreate(BaseModel):
     email: str
     password: str
     full_name: str
+    doctor_id: str
+    specialty: Optional[str] = None
+    license_number: Optional[str] = None
+    hospital_affiliation: Optional[str] = None
 
 class UserLogin(BaseModel):
     username: str
