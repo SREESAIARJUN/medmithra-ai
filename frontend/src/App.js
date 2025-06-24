@@ -79,88 +79,12 @@ const useSpeechRecognition = () => {
   };
 };
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
-
-// Speech Recognition Hook
-const useSpeechRecognition = () => {
-  const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const recognitionRef = useRef(null);
-
-  useEffect(() => {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      console.log('Speech recognition not supported');
-      return;
-    }
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognitionRef.current = new SpeechRecognition();
-    
-    const recognition = recognitionRef.current;
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
-
-    recognition.onresult = (event) => {
-      let finalTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
-        }
-      }
-      if (finalTranscript) {
-        setTranscript(prev => prev + finalTranscript);
-      }
-    };
-
-    recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error);
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    return () => {
-      recognition.stop();
-    };
-  }, []);
-
-  const startListening = () => {
-    if (recognitionRef.current && !isListening) {
-      recognitionRef.current.start();
-      setIsListening(true);
-    }
-  };
-
-  const stopListening = () => {
-    if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    }
-  };
-
-  const resetTranscript = () => {
-    setTranscript('');
-  };
-
-  return {
-    transcript,
-    isListening,
-    startListening,
-    stopListening,
-    resetTranscript,
-    hasRecognitionSupport: !!(window.SpeechRecognition || window.webkitSpeechRecognition)
-  };
-};
-
 const App = () => {
   const [currentView, setCurrentView] = useState('home');
   const [cases, setCases] = useState([]);
   const [selectedCase, setSelectedCase] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [feedbackStats, setFeedbackStats] = useState(null);
   
   // New case form state
   const [patientSummary, setPatientSummary] = useState('');
@@ -170,11 +94,40 @@ const App = () => {
   // Query state
   const [query, setQuery] = useState('');
   const [queryResult, setQueryResult] = useState(null);
+  
+  // Search filters state
+  const [searchFilters, setSearchFilters] = useState({
+    date_from: '',
+    date_to: '',
+    confidence_min: '',
+    has_files: '',
+    search_text: ''
+  });
+  const [searchResults, setSearchResults] = useState(null);
 
-  // Load cases on component mount
+  // Speech recognition
+  const {
+    transcript,
+    isListening,
+    startListening,
+    stopListening,
+    resetTranscript,
+    hasRecognitionSupport
+  } = useSpeechRecognition();
+
+  // Load cases and feedback stats on component mount
   useEffect(() => {
     loadCases();
+    loadFeedbackStats();
   }, []);
+
+  // Update patient summary when speech transcript changes
+  useEffect(() => {
+    if (transcript && currentView === 'new-case') {
+      setPatientSummary(prev => prev + ' ' + transcript);
+      resetTranscript();
+    }
+  }, [transcript, currentView, resetTranscript]);
 
   const loadCases = async () => {
     try {
@@ -182,6 +135,15 @@ const App = () => {
       setCases(response.data);
     } catch (error) {
       console.error('Error loading cases:', error);
+    }
+  };
+
+  const loadFeedbackStats = async () => {
+    try {
+      const response = await axios.get(`${API}/feedback/stats`);
+      setFeedbackStats(response.data);
+    } catch (error) {
+      console.error('Error loading feedback stats:', error);
     }
   };
 
@@ -234,6 +196,25 @@ const App = () => {
     }
   };
 
+  const submitFeedback = async (caseId, feedbackType, feedbackText = '') => {
+    try {
+      await axios.post(`${API}/cases/${caseId}/feedback`, {
+        case_id: caseId,
+        doctor_id: 'default_doctor',
+        feedback_type: feedbackType,
+        feedback_text: feedbackText
+      });
+      
+      // Reload feedback stats
+      loadFeedbackStats();
+      alert('Feedback submitted successfully!');
+      
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      alert('Error submitting feedback');
+    }
+  };
+
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
     setSelectedFiles(files);
@@ -252,6 +233,31 @@ const App = () => {
     } catch (error) {
       console.error('Error processing query:', error);
       alert('Error processing query');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAdvancedSearch = async () => {
+    setLoading(true);
+    try {
+      const filters = {
+        doctor_id: 'default_doctor',
+        ...searchFilters
+      };
+      
+      // Remove empty filters
+      Object.keys(filters).forEach(key => {
+        if (filters[key] === '' || filters[key] === null || filters[key] === undefined) {
+          delete filters[key];
+        }
+      });
+      
+      const response = await axios.post(`${API}/cases/search`, filters);
+      setSearchResults(response.data);
+    } catch (error) {
+      console.error('Error in advanced search:', error);
+      alert('Error in advanced search');
     } finally {
       setLoading(false);
     }
@@ -294,6 +300,30 @@ const App = () => {
         </div>
       </div>
       
+      {feedbackStats && (
+        <div className="stats-section">
+          <h2 className="section-title">Performance Dashboard</h2>
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-number">{feedbackStats.total_feedback}</div>
+              <div className="stat-label">Total Feedback</div>
+            </div>
+            <div className="stat-card positive">
+              <div className="stat-number">{feedbackStats.positive_feedback}</div>
+              <div className="stat-label">Positive Reviews</div>
+            </div>
+            <div className="stat-card negative">
+              <div className="stat-number">{feedbackStats.negative_feedback}</div>
+              <div className="stat-label">Negative Reviews</div>
+            </div>
+            <div className="stat-card satisfaction">
+              <div className="stat-number">{feedbackStats.satisfaction_rate}%</div>
+              <div className="stat-label">Satisfaction Rate</div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="features-section">
         <h2 className="section-title">Features</h2>
         <div className="features-grid">
@@ -317,6 +347,16 @@ const App = () => {
             <h3>AI Diagnosis</h3>
             <p>Get differential diagnoses with confidence scores</p>
           </div>
+          <div className="feature-card">
+            <div className="feature-icon">🎤</div>
+            <h3>Voice Dictation</h3>
+            <p>Use speech-to-text for hands-free case entry</p>
+          </div>
+          <div className="feature-card">
+            <div className="feature-icon">📊</div>
+            <h3>Feedback Analytics</h3>
+            <p>Track AI performance and improve over time</p>
+          </div>
         </div>
       </div>
     </div>
@@ -337,12 +377,27 @@ const App = () => {
       <div className="case-form">
         <div className="form-group">
           <label>Patient Case Summary</label>
-          <textarea
-            value={patientSummary}
-            onChange={(e) => setPatientSummary(e.target.value)}
-            placeholder="Enter patient history, symptoms, and clinical observations..."
-            rows="6"
-          />
+          <div className="textarea-container">
+            <textarea
+              value={patientSummary}
+              onChange={(e) => setPatientSummary(e.target.value)}
+              placeholder="Enter patient history, symptoms, and clinical observations..."
+              rows="6"
+            />
+            {hasRecognitionSupport && (
+              <div className="speech-controls">
+                <button
+                  type="button"
+                  className={`speech-button ${isListening ? 'listening' : ''}`}
+                  onClick={isListening ? stopListening : startListening}
+                  title={isListening ? 'Stop dictation' : 'Start dictation'}
+                >
+                  🎤 {isListening ? 'Stop' : 'Dictate'}
+                </button>
+                {isListening && <span className="listening-indicator">Listening...</span>}
+              </div>
+            )}
+          </div>
         </div>
         
         <div className="form-group">
@@ -379,7 +434,25 @@ const App = () => {
       
       {analysisResult && (
         <div className="analysis-results">
-          <h3>Clinical Analysis Results</h3>
+          <div className="analysis-header">
+            <h3>Clinical Analysis Results</h3>
+            <div className="feedback-buttons">
+              <button 
+                className="feedback-positive"
+                onClick={() => submitFeedback(analysisResult.case_id, 'positive')}
+                title="Good analysis"
+              >
+                👍 Good
+              </button>
+              <button 
+                className="feedback-negative"
+                onClick={() => submitFeedback(analysisResult.case_id, 'negative')}
+                title="Poor analysis"
+              >
+                👎 Poor
+              </button>
+            </div>
+          </div>
           
           <div className="confidence-score">
             <h4>Confidence Score: {analysisResult.confidence_score}%</h4>
@@ -473,7 +546,7 @@ const App = () => {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ask about cases (e.g., 'Show cases from yesterday')"
+            placeholder="Ask about cases (e.g., 'Show yesterday's CBC results')"
           />
           <button onClick={handleQuery} disabled={loading}>
             {loading ? 'Searching...' : 'Search'}
@@ -488,8 +561,80 @@ const App = () => {
         )}
       </div>
       
+      <div className="advanced-search">
+        <h3>Advanced Search & Filters</h3>
+        <div className="search-form">
+          <div className="search-row">
+            <div className="search-field">
+              <label>From Date</label>
+              <input
+                type="date"
+                value={searchFilters.date_from}
+                onChange={(e) => setSearchFilters({...searchFilters, date_from: e.target.value})}
+              />
+            </div>
+            <div className="search-field">
+              <label>To Date</label>
+              <input
+                type="date"
+                value={searchFilters.date_to}
+                onChange={(e) => setSearchFilters({...searchFilters, date_to: e.target.value})}
+              />
+            </div>
+            <div className="search-field">
+              <label>Min Confidence</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={searchFilters.confidence_min}
+                onChange={(e) => setSearchFilters({...searchFilters, confidence_min: e.target.value})}
+                placeholder="0-100"
+              />
+            </div>
+          </div>
+          <div className="search-row">
+            <div className="search-field">
+              <label>Has Files</label>
+              <select
+                value={searchFilters.has_files}
+                onChange={(e) => setSearchFilters({...searchFilters, has_files: e.target.value})}
+              >
+                <option value="">Any</option>
+                <option value="true">With Files</option>
+                <option value="false">Without Files</option>
+              </select>
+            </div>
+            <div className="search-field">
+              <label>Search Text</label>
+              <input
+                type="text"
+                value={searchFilters.search_text}
+                onChange={(e) => setSearchFilters({...searchFilters, search_text: e.target.value})}
+                placeholder="Search in case summary..."
+              />
+            </div>
+            <div className="search-field">
+              <button 
+                className="search-button"
+                onClick={handleAdvancedSearch}
+                disabled={loading}
+              >
+                {loading ? 'Searching...' : 'Search'}
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {searchResults && (
+          <div className="search-results">
+            <h4>Found {searchResults.total_found} cases</h4>
+          </div>
+        )}
+      </div>
+      
       <div className="cases-grid">
-        {cases.map((case_item) => (
+        {(searchResults ? searchResults.cases : cases).map((case_item) => (
           <div key={case_item.id} className="case-card">
             <div className="case-header">
               <h4>Case {case_item.id.substring(0, 8)}</h4>
@@ -548,7 +693,25 @@ const App = () => {
           
           {selectedCase.analysis_result && (
             <div className="analysis-results">
-              <h3>Analysis Results</h3>
+              <div className="analysis-header">
+                <h3>Analysis Results</h3>
+                <div className="feedback-buttons">
+                  <button 
+                    className="feedback-positive"
+                    onClick={() => submitFeedback(selectedCase.id, 'positive')}
+                    title="Good analysis"
+                  >
+                    👍 Good
+                  </button>
+                  <button 
+                    className="feedback-negative"
+                    onClick={() => submitFeedback(selectedCase.id, 'negative')}
+                    title="Poor analysis"
+                  >
+                    👎 Poor
+                  </button>
+                </div>
+              </div>
               
               <div className="confidence-score">
                 <h4>Confidence Score: {selectedCase.confidence_score}%</h4>
