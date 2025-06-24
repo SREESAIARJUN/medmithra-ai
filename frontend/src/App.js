@@ -668,6 +668,65 @@ const AppContent = () => {
       
       <Card className="p-8 mb-8">
         <div className="space-y-6">
+          {/* Patient Information Section */}
+          <div className="border-b border-gray-200 dark:border-gray-600 pb-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Patient Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Input
+                label="Patient ID"
+                value={patientDetails.patient_id}
+                onChange={(e) => setPatientDetails({...patientDetails, patient_id: e.target.value})}
+                placeholder="Patient ID"
+              />
+              <Input
+                label="Patient Name"
+                value={patientDetails.patient_name}
+                onChange={(e) => setPatientDetails({...patientDetails, patient_name: e.target.value})}
+                placeholder="Patient full name"
+              />
+              <Input
+                label="Age"
+                type="number"
+                value={patientDetails.patient_age}
+                onChange={(e) => setPatientDetails({...patientDetails, patient_age: e.target.value})}
+                placeholder="Age"
+              />
+              <div className="form-group">
+                <label className="form-label">Gender</label>
+                <select
+                  value={patientDetails.patient_gender}
+                  onChange={(e) => setPatientDetails({...patientDetails, patient_gender: e.target.value})}
+                  className="input"
+                >
+                  <option value="">Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Doctor Information Section */}
+          <div className="border-b border-gray-200 dark:border-gray-600 pb-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Doctor Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Doctor Name"
+                value={patientDetails.doctor_name || (currentUser?.full_name || currentUser?.username)}
+                onChange={(e) => setPatientDetails({...patientDetails, doctor_name: e.target.value})}
+                placeholder="Attending physician"
+              />
+              <Input
+                label="Doctor ID"
+                value={currentUser?.id || ''}
+                disabled
+                className="bg-gray-100 dark:bg-gray-700"
+              />
+            </div>
+          </div>
+          
+          {/* Clinical Summary Section */}
           <div>
             <label className="form-label">Patient Case Summary</label>
             <div className="relative">
