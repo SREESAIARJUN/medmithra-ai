@@ -94,7 +94,104 @@ class SearchFilters(BaseModel):
     confidence_min: Optional[float] = None
     has_files: Optional[bool] = None
     search_text: Optional[str] = None
-# Helper Functions
+async def analyze_individual_files(uploaded_files: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    """Analyze each uploaded file individually to get per-file interpretations"""
+    file_interpretations = []
+    
+    for file_info in uploaded_files:
+        if not os.path.exists(file_info["file_path"]):
+            continue
+            
+        try:
+            # Create a new Gemini chat instance for individual file analysis
+            session_id = f"file-analysis-{uuid.uuid4()}"
+            chat = LlmChat(
+                api_key=GEMINI_API_KEY,
+                session_id=session_id,
+                system_message="""You are a medical file analysis specialist. Analyze the provided medical file and return a structured interpretation.
+                
+                For lab files (CSV/PDF): Extract and interpret lab values, identify abnormal results, clinical significance.
+                For medical images: Describe findings, identify abnormalities, suggest differential diagnoses.
+                For text files: Summarize key medical information and clinical relevance.
+                
+                Respond in JSON format:
+                {
+                    "file_type": "lab_report|medical_image|text_document",
+                    "key_findings": ["finding1", "finding2"],
+                    "abnormal_values": ["abnormal1", "abnormal2"],
+                    "clinical_significance": "detailed interpretation",
+                    "recommendations": ["recommendation1", "recommendation2"]
+                }"""
+            ).with_model("gemini", "gemini-2.5-pro-preview-05-06").with_max_tokens(4096)
+            
+            # Analyze the individual file
+            file_content = FileContentWithMimeType(
+                file_path=file_info["file_path"],
+                mime_type=file_info["mime_type"]
+            )
+            
+            analysis_prompt = f"""
+            ANALYZE THIS MEDICAL FILE:
+            File name: {file_info["original_name"]}
+            File type: {file_info["mime_type"]}
+            
+            Please provide a detailed medical interpretation of this file including:
+            1. Key findings
+            2. Any abnormal values or concerning features
+            3. Clinical significance
+            4. Recommendations for follow-up or treatment
+            
+            Format your response as JSON.
+            """
+            
+            user_message = UserMessage(
+                text=analysis_prompt,
+                file_contents=[file_content]
+            )
+            
+            response = await chat.send_message(user_message)
+            
+            # Try to parse JSON response
+            try:
+                import json
+                analysis_data = json.loads(response)
+                
+                file_interpretation = {
+                    "file_name": file_info["original_name"],
+                    "file_type": analysis_data.get("file_type", "unknown"),
+                    "key_findings": analysis_data.get("key_findings", []),
+                    "abnormal_values": analysis_data.get("abnormal_values", []),
+                    "clinical_significance": analysis_data.get("clinical_significance", "No specific findings"),
+                    "recommendations": analysis_data.get("recommendations", []),
+                    "full_interpretation": response[:500]  # Keep full response as backup
+                }
+            except json.JSONDecodeError:
+                # Fallback if response is not JSON
+                file_interpretation = {
+                    "file_name": file_info["original_name"],
+                    "file_type": "analysis_completed",
+                    "key_findings": ["See detailed interpretation"],
+                    "abnormal_values": [],
+                    "clinical_significance": response[:300],
+                    "recommendations": ["Review detailed analysis"],
+                    "full_interpretation": response[:500]
+                }
+            
+            file_interpretations.append(file_interpretation)
+            
+        except Exception as e:
+            logging.error(f"Error analyzing file {file_info['original_name']}: {str(e)}")
+            file_interpretations.append({
+                "file_name": file_info["original_name"],
+                "file_type": "error",
+                "key_findings": ["Analysis failed"],
+                "abnormal_values": [],
+                "clinical_significance": f"Error in analysis: {str(e)}",
+                "recommendations": ["Retry analysis"],
+                "full_interpretation": f"Error: {str(e)}"
+            })
+    
+    return file_interpretations
 async def save_uploaded_file(file: UploadFile) -> Dict[str, Any]:
     """Save uploaded file and return file info"""
     file_id = str(uuid.uuid4())
