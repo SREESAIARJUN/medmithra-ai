@@ -118,6 +118,13 @@ const AppContent = () => {
   
   // New case form state
   const [patientSummary, setPatientSummary] = useState('');
+  const [patientDetails, setPatientDetails] = useState({
+    patient_id: '',
+    patient_name: '',
+    patient_age: '',
+    patient_gender: '',
+    doctor_name: ''
+  });
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [analysisResult, setAnalysisResult] = useState(null);
   
