@@ -18,6 +18,15 @@ import asyncio
 # Import Gemini integration
 from emergentintegrations.llm.chat import LlmChat, UserMessage, FileContentWithMimeType
 
+# Import PDF generation
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from io import BytesIO
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
