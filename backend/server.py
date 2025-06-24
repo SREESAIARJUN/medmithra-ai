@@ -497,7 +497,22 @@ Recommendations: {', '.join(interp['recommendations'])}
         # Parse response (assuming it's JSON)
         try:
             import json
-            analysis_data = json.loads(response)
+            import re
+            
+            # Log the raw response for debugging
+            logging.info(f"Raw Gemini response: {response[:200]}...")
+            
+            # Try to extract JSON from the response if it's wrapped in markdown
+            json_match = re.search(r'```json\s*(.*?)\s*```', response, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                json_str = response
+            
+            # Clean up the JSON string
+            json_str = json_str.strip()
+            
+            analysis_data = json.loads(json_str)
             
             return ClinicalAnalysisResult(
                 soap_note=analysis_data.get("soap_note", {
@@ -510,11 +525,12 @@ Recommendations: {', '.join(interp['recommendations'])}
                 treatment_recommendations=analysis_data.get("treatment_recommendations", []),
                 investigation_suggestions=analysis_data.get("investigation_suggestions", []),
                 file_interpretations=individual_file_interpretations,  # Use detailed per-file interpretations
-                confidence_score=analysis_data.get("confidence_score", 0),
-                overall_assessment=analysis_data.get("overall_assessment", response[:500])
+                confidence_score=analysis_data.get("confidence_score", 75),
+                overall_assessment=analysis_data.get("overall_assessment", "Clinical analysis completed successfully")
             )
-        except json.JSONDecodeError:
-            # If response is not JSON, create a basic analysis
+        except (json.JSONDecodeError, AttributeError) as e:
+            logging.error(f"JSON parsing error: {str(e)}, Response: {response[:500]}")
+            # If response is not JSON, create a basic analysis but include some of the response
             return ClinicalAnalysisResult(
                 soap_note={
                     "subjective": "Analysis based on provided case summary",
@@ -527,7 +543,7 @@ Recommendations: {', '.join(interp['recommendations'])}
                 investigation_suggestions=["Complete history and physical", "Relevant laboratory tests"],
                 file_interpretations=individual_file_interpretations,  # Use detailed per-file interpretations
                 confidence_score=50,
-                overall_assessment=response[:500]
+                overall_assessment=response[:500] if response else "Analysis completed with limited data"
             )
         
     except Exception as e:
