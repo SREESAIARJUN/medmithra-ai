@@ -223,13 +223,13 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "Case Querying"
-  stuck_tasks:
-    - "Case Querying"
+  current_focus: []
+  stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
   - agent: "testing"
     message: "I've completed testing of the clinical insight assistant backend API. All core functionality is working correctly, including API connectivity, case creation, file upload, clinical analysis with Gemini integration, and case retrieval. The only issue found is with the case querying endpoint, which fails due to a MongoDB ObjectId serialization error. This is a minor issue that can be fixed by updating the server.py code to convert ObjectId objects to strings before returning them in the response."
+  - agent: "testing"
+    message: "I've completed testing of all the enhanced features of the Clinical Insight Assistant. The previously reported issue with the Case Querying endpoint has been fixed - the MongoDB ObjectId serialization problem has been resolved. All query types (yesterday, today, lab tests, patient ID, text search) now work correctly. The new Feedback System is working properly, allowing submission of positive and negative feedback and retrieving statistics. The Advanced Search functionality works with all filter types. The complete enhanced workflow (case creation, file upload, analysis, feedback, search, query) works end-to-end. All backend APIs are now functioning correctly."
