@@ -729,7 +729,11 @@ async def login_user(login_data: UserLogin):
                 "id": user["id"],
                 "username": user["username"],
                 "full_name": user["full_name"],
-                "email": user["email"]
+                "email": user["email"],
+                "doctor_id": user.get("doctor_id", ""),
+                "specialty": user.get("specialty", ""),
+                "license_number": user.get("license_number", ""),
+                "hospital_affiliation": user.get("hospital_affiliation", "")
             }
         }
         
