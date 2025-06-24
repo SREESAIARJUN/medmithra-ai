@@ -127,6 +127,10 @@ class User(BaseModel):
     email: str
     password_hash: str
     full_name: str
+    doctor_id: str
+    specialty: Optional[str] = None
+    license_number: Optional[str] = None
+    hospital_affiliation: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: Optional[datetime] = None
 
