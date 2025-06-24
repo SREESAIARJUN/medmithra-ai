@@ -452,7 +452,7 @@ async def analyze_clinical_case(case_summary: str, uploaded_files: List[Dict[str
             }
             
             Important: This is an AI assistant tool and should not replace professional medical judgment."""
-        ).with_model("gemini", "gemini-2.5-pro-preview-05-06").with_max_tokens(8192)
+        ).with_model("gemini", "gemini-2.5-flash-preview-04-17").with_max_tokens(8192)
         
         # Prepare files for analysis
         file_contents = []
