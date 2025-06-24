@@ -218,9 +218,12 @@ async def save_uploaded_file(file: UploadFile) -> Dict[str, Any]:
     return file_info
 
 async def analyze_clinical_case(case_summary: str, uploaded_files: List[Dict[str, Any]]) -> ClinicalAnalysisResult:
-    """Analyze clinical case using Gemini 2.5 Pro"""
+    """Analyze clinical case using Gemini 2.5 Pro with enhanced per-file analysis"""
     try:
-        # Create a new Gemini chat instance for this analysis
+        # First, analyze each file individually
+        individual_file_interpretations = await analyze_individual_files(uploaded_files)
+        
+        # Create a new Gemini chat instance for comprehensive analysis
         session_id = f"clinical-analysis-{uuid.uuid4()}"
         chat = LlmChat(
             api_key=GEMINI_API_KEY,
@@ -232,8 +235,8 @@ async def analyze_clinical_case(case_summary: str, uploaded_files: List[Dict[str
             2. Provide differential diagnoses with likelihood rankings
             3. Recommend treatment plans with evidence-based rationale
             4. Suggest additional investigations if needed
-            5. Interpret uploaded medical files (lab reports, images, etc.)
-            6. Provide an overall confidence score (0-100)
+            5. Provide an overall confidence score (0-100)
+            6. Synthesize individual file analyses into comprehensive clinical assessment
             
             Always respond in JSON format with the following structure:
             {
@@ -249,9 +252,6 @@ async def analyze_clinical_case(case_summary: str, uploaded_files: List[Dict[str
                 ],
                 "treatment_recommendations": ["Recommendation 1", "Recommendation 2"],
                 "investigation_suggestions": ["Test 1", "Test 2"],
-                "file_interpretations": [
-                    {"file_name": "filename", "interpretation": "detailed analysis"}
-                ],
                 "confidence_score": 85,
                 "overall_assessment": "Comprehensive clinical summary"
             }
@@ -269,23 +269,35 @@ async def analyze_clinical_case(case_summary: str, uploaded_files: List[Dict[str
                 )
                 file_contents.append(file_content)
         
-        # Create comprehensive analysis prompt
+        # Create comprehensive analysis prompt including individual file interpretations
+        file_summary = "INDIVIDUAL FILE ANALYSES:\n"
+        for interp in individual_file_interpretations:
+            file_summary += f"""
+File: {interp['file_name']}
+Type: {interp['file_type']}
+Key Findings: {', '.join(interp['key_findings'])}
+Clinical Significance: {interp['clinical_significance']}
+Recommendations: {', '.join(interp['recommendations'])}
+---
+"""
+        
         analysis_prompt = f"""
         PATIENT CASE SUMMARY:
         {case_summary}
         
         UPLOADED FILES: {len(file_contents)} files attached for analysis
         
-        Please analyze this patient's complete medical data including the case summary and all uploaded files. 
-        Generate a comprehensive clinical analysis with:
-        1) SOAP notes
-        2) Differential diagnoses with likelihood rankings
-        3) Treatment recommendations with rationale
-        4) Investigation suggestions
-        5) Interpretation of each uploaded file
-        6) Overall confidence score (0-100)
-        7) Comprehensive clinical assessment
+        {file_summary}
         
+        Please synthesize all the above information to provide a comprehensive clinical analysis:
+        1) SOAP notes incorporating all available data
+        2) Differential diagnoses with likelihood rankings based on case summary and file findings
+        3) Treatment recommendations considering all clinical data
+        4) Investigation suggestions based on current findings
+        5) Overall confidence score (0-100) considering data quality and clinical complexity
+        6) Comprehensive clinical assessment
+        
+        Consider the individual file analyses when forming your overall assessment.
         Respond in the specified JSON format.
         """
         
@@ -312,7 +324,7 @@ async def analyze_clinical_case(case_summary: str, uploaded_files: List[Dict[str
                 differential_diagnoses=analysis_data.get("differential_diagnoses", []),
                 treatment_recommendations=analysis_data.get("treatment_recommendations", []),
                 investigation_suggestions=analysis_data.get("investigation_suggestions", []),
-                file_interpretations=analysis_data.get("file_interpretations", []),
+                file_interpretations=individual_file_interpretations,  # Use detailed per-file interpretations
                 confidence_score=analysis_data.get("confidence_score", 0),
                 overall_assessment=analysis_data.get("overall_assessment", response[:500])
             )
@@ -328,7 +340,7 @@ async def analyze_clinical_case(case_summary: str, uploaded_files: List[Dict[str
                 differential_diagnoses=[{"diagnosis": "Requires further evaluation", "likelihood": 50, "rationale": "Insufficient data for definitive diagnosis"}],
                 treatment_recommendations=["Consult with specialist", "Additional diagnostic tests"],
                 investigation_suggestions=["Complete history and physical", "Relevant laboratory tests"],
-                file_interpretations=[{"file_name": "all_files", "interpretation": response[:200]}],
+                file_interpretations=individual_file_interpretations,  # Use detailed per-file interpretations
                 confidence_score=50,
                 overall_assessment=response[:500]
             )
