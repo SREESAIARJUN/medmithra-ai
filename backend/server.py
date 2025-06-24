@@ -775,6 +775,41 @@ async def get_user_audit_trail(user_id: str):
         logging.error(f"User audit trail error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# PDF Export Endpoint
+@api_router.get("/cases/{case_id}/export-pdf")
+async def export_case_pdf(case_id: str):
+    """Export case to PDF"""
+    try:
+        # Find the case
+        case = await db.clinical_cases.find_one({"id": case_id})
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+        
+        # Convert datetime objects to strings for PDF generation
+        if "created_at" in case and hasattr(case["created_at"], "strftime"):
+            case["created_at"] = case["created_at"].strftime("%Y-%m-%d %H:%M:%S")
+        if "updated_at" in case and hasattr(case["updated_at"], "strftime"):
+            case["updated_at"] = case["updated_at"].strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Generate PDF
+        pdf_buffer = generate_case_pdf(case)
+        
+        # Log audit event
+        await log_audit_event(case.get("doctor_id", "unknown"), "case_exported", case_id, "Case exported to PDF")
+        
+        # Return PDF as response
+        from fastapi.responses import StreamingResponse
+        
+        return StreamingResponse(
+            io.BytesIO(pdf_buffer.read()),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=case_{case_id[:8]}_report.pdf"}
+        )
+        
+    except Exception as e:
+        logging.error(f"PDF export error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.post("/cases/{case_id}/analyze")
 async def analyze_case(case_id: str):
     """Analyze a clinical case with uploaded files"""
