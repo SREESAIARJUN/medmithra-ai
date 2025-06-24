@@ -14,6 +14,7 @@ import aiofiles
 import base64
 import mimetypes
 import asyncio
+import io
 
 # Import Gemini integration
 from emergentintegrations.llm.chat import LlmChat, UserMessage, FileContentWithMimeType
