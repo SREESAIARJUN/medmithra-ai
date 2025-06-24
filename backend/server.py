@@ -148,6 +148,13 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
+class UserProfile(BaseModel):
+    full_name: str
+    doctor_id: str
+    specialty: Optional[str] = None
+    license_number: Optional[str] = None
+    hospital_affiliation: Optional[str] = None
+
 class AuditLog(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str
