@@ -509,6 +509,175 @@ class ClinicalInsightAPITest(unittest.TestCase):
         
         print("✅ Complete enhanced workflow test passed")
 
+    def test_11_authentication_system(self):
+        """Test the authentication system (registration, login, logout, session verification)"""
+        print("\n=== Testing Authentication System ===")
+        
+        # Generate a unique username to avoid conflicts
+        timestamp = int(time.time())
+        test_username = f"testuser_{timestamp}"
+        test_email = f"test_{timestamp}@example.com"
+        test_password = "SecurePassword123!"
+        
+        # 1. Test user registration
+        print("1. Testing user registration")
+        register_payload = {
+            "username": test_username,
+            "email": test_email,
+            "password": test_password,
+            "full_name": "Test User"
+        }
+        
+        response = requests.post(f"{API_URL}/auth/register", json=register_payload)
+        print(f"Registration response status: {response.status_code}")
+        
+        self.assertEqual(response.status_code, 200)
+        user_data = response.json()
+        self.assertIn("id", user_data)
+        self.assertEqual(user_data["username"], test_username)
+        self.assertEqual(user_data["email"], test_email)
+        print(f"Successfully registered user: {test_username}")
+        
+        # 2. Test user login
+        print("\n2. Testing user login")
+        login_payload = {
+            "username": test_username,
+            "password": test_password
+        }
+        
+        response = requests.post(f"{API_URL}/auth/login", json=login_payload)
+        print(f"Login response status: {response.status_code}")
+        
+        self.assertEqual(response.status_code, 200)
+        login_data = response.json()
+        self.assertIn("session_token", login_data)
+        self.assertIn("user", login_data)
+        self.assertEqual(login_data["user"]["username"], test_username)
+        
+        # Save session token for subsequent tests
+        session_token = login_data["session_token"]
+        print(f"Successfully logged in user: {test_username}")
+        
+        # 3. Test session verification
+        print("\n3. Testing session verification")
+        response = requests.get(f"{API_URL}/auth/verify?session_token={session_token}")
+        print(f"Session verification response status: {response.status_code}")
+        
+        self.assertEqual(response.status_code, 200)
+        verify_data = response.json()
+        self.assertTrue(verify_data["valid"])
+        self.assertEqual(verify_data["user"]["username"], test_username)
+        print("Successfully verified session")
+        
+        # 4. Test logout
+        print("\n4. Testing user logout")
+        response = requests.post(f"{API_URL}/auth/logout", json={"session_token": session_token})
+        print(f"Logout response status: {response.status_code}")
+        
+        self.assertEqual(response.status_code, 200)
+        logout_data = response.json()
+        self.assertIn("message", logout_data)
+        print("Successfully logged out user")
+        
+        # 5. Verify session is invalid after logout
+        print("\n5. Verifying session is invalid after logout")
+        response = requests.get(f"{API_URL}/auth/verify?session_token={session_token}")
+        print(f"Post-logout verification response status: {response.status_code}")
+        
+        self.assertEqual(response.status_code, 401)
+        print("Session correctly invalidated after logout")
+        
+        print("✅ Authentication system test passed")
+    
+    def test_12_pdf_export(self):
+        """Test PDF generation and export functionality"""
+        if not hasattr(self.__class__, 'case_id') or not self.__class__.case_id:
+            self.skipTest("Case ID not available. Skipping PDF export test.")
+            
+        print("\n=== Testing PDF Export ===")
+        
+        # First, ensure the case has analysis results
+        print("Checking if case has analysis results")
+        response = requests.get(f"{API_URL}/cases/{self.__class__.case_id}")
+        case = response.json()
+        
+        if not case.get("analysis_result"):
+            print("Case doesn't have analysis results. Running analysis first.")
+            response = requests.post(f"{API_URL}/cases/{self.__class__.case_id}/analyze")
+            self.assertEqual(response.status_code, 200)
+            print("Analysis completed")
+        
+        # Test PDF export
+        print("Testing PDF export")
+        response = requests.get(f"{API_URL}/cases/{self.__class__.case_id}/export-pdf")
+        print(f"PDF export response status: {response.status_code}")
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Content-Type"], "application/pdf")
+        self.assertIn("Content-Disposition", response.headers)
+        self.assertIn(f"attachment; filename=case_{self.__class__.case_id[:8]}_report.pdf", response.headers["Content-Disposition"])
+        
+        # Check if we got actual PDF content
+        self.assertTrue(len(response.content) > 0)
+        self.assertTrue(response.content.startswith(b'%PDF'))
+        
+        print(f"Successfully exported PDF for case {self.__class__.case_id}")
+        print("✅ PDF export test passed")
+    
+    def test_13_audit_trail(self):
+        """Test audit logging functionality"""
+        print("\n=== Testing Audit Trail ===")
+        
+        # 1. Test getting all audit logs
+        print("1. Testing retrieval of all audit logs")
+        response = requests.get(f"{API_URL}/audit/logs")
+        print(f"Audit logs response status: {response.status_code}")
+        
+        self.assertEqual(response.status_code, 200)
+        logs_data = response.json()
+        self.assertIn("logs", logs_data)
+        self.assertIn("total", logs_data)
+        print(f"Retrieved {logs_data['total']} audit logs")
+        
+        # 2. Test filtering audit logs by action
+        print("\n2. Testing filtering audit logs by action")
+        response = requests.get(f"{API_URL}/audit/logs?action=case_created")
+        print(f"Filtered audit logs response status: {response.status_code}")
+        
+        self.assertEqual(response.status_code, 200)
+        filtered_logs = response.json()
+        self.assertIn("logs", filtered_logs)
+        
+        # Verify all logs have the requested action
+        if filtered_logs["logs"]:
+            for log in filtered_logs["logs"]:
+                self.assertEqual(log["action"], "case_created")
+        
+        print(f"Retrieved {len(filtered_logs['logs'])} logs with action 'case_created'")
+        
+        # 3. Test getting audit trail for a specific user
+        if filtered_logs["logs"]:
+            # Get a user_id from the logs
+            user_id = filtered_logs["logs"][0]["user_id"]
+            
+            print(f"\n3. Testing audit trail for user {user_id}")
+            response = requests.get(f"{API_URL}/audit/user/{user_id}")
+            print(f"User audit trail response status: {response.status_code}")
+            
+            self.assertEqual(response.status_code, 200)
+            user_logs = response.json()
+            self.assertIn("logs", user_logs)
+            self.assertIn("user_id", user_logs)
+            self.assertEqual(user_logs["user_id"], user_id)
+            
+            # Verify all logs belong to the requested user
+            for log in user_logs["logs"]:
+                self.assertEqual(log["user_id"], user_id)
+            
+            print(f"Retrieved {len(user_logs['logs'])} logs for user {user_id}")
+        
+        print("✅ Audit trail test passed")
+
 if __name__ == "__main__":
     # Run the tests in order
     unittest.main(argv=['first-arg-is-ignored'], exit=False)
