@@ -58,7 +58,12 @@ if not GEMINI_API_KEY:
 class ClinicalCase(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     patient_summary: str
+    patient_id: Optional[str] = None  # Patient identifier
+    patient_name: Optional[str] = None  # Patient name
+    patient_age: Optional[int] = None  # Patient age
+    patient_gender: Optional[str] = None  # Patient gender
     doctor_id: str = "default_doctor"  # Simple auth for now
+    doctor_name: Optional[str] = None  # Doctor name
     uploaded_files: List[Dict[str, Any]] = Field(default_factory=list)
     analysis_result: Optional[Dict[str, Any]] = None
     confidence_score: Optional[float] = None
@@ -67,7 +72,12 @@ class ClinicalCase(BaseModel):
 
 class ClinicalCaseCreate(BaseModel):
     patient_summary: str
+    patient_id: Optional[str] = None
+    patient_name: Optional[str] = None
+    patient_age: Optional[int] = None
+    patient_gender: Optional[str] = None
     doctor_id: str = "default_doctor"
+    doctor_name: Optional[str] = None
 
 class ClinicalAnalysisResult(BaseModel):
     soap_note: Dict[str, str]
