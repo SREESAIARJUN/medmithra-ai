@@ -514,7 +514,36 @@ const AppContent = () => {
             type="text"
             value={registerData.full_name}
             onChange={(e) => setRegisterData({...registerData, full_name: e.target.value})}
-            placeholder="Enter your full name"
+            placeholder="Dr. John Smith"
+          />
+          
+          <Input
+            label="Doctor ID"
+            value={registerData.doctor_id}
+            onChange={(e) => setRegisterData({...registerData, doctor_id: e.target.value})}
+            placeholder="DR001"
+            required
+          />
+          
+          <Input
+            label="Medical Specialty"
+            value={registerData.specialty}
+            onChange={(e) => setRegisterData({...registerData, specialty: e.target.value})}
+            placeholder="Internal Medicine, Cardiology, etc."
+          />
+          
+          <Input
+            label="License Number"
+            value={registerData.license_number}
+            onChange={(e) => setRegisterData({...registerData, license_number: e.target.value})}
+            placeholder="Medical license number"
+          />
+          
+          <Input
+            label="Hospital Affiliation"
+            value={registerData.hospital_affiliation}
+            onChange={(e) => setRegisterData({...registerData, hospital_affiliation: e.target.value})}
+            placeholder="Hospital or clinic name"
           />
           
           <Input
