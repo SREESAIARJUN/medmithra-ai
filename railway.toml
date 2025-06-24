@@ -1,0 +1,35 @@
+[build]
+cmd = "echo 'Building full-stack app'"
+
+[deploy]
+startCommand = "echo 'Use individual service configurations'"
+
+# Backend Service Configuration
+[[services]]
+name = "backend"
+source = "backend"
+
+[services.build]
+cmd = "pip install -r requirements.txt"
+
+[services.deploy]
+startCommand = "uvicorn server:app --host 0.0.0.0 --port $PORT"
+
+[services.variables]
+PYTHONPATH = "/app/backend"
+PORT = "8000"
+
+# Frontend Service Configuration  
+[[services]]
+name = "frontend"
+source = "frontend"
+
+[services.build]
+cmd = "npm install && npm run build"
+
+[services.deploy]
+startCommand = "npx serve -s build -l $PORT"
+
+[services.variables]
+NODE_ENV = "production"
+PORT = "3000"

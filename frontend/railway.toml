@@ -1,0 +1,9 @@
+[build]
+cmd = "npm install && npm run build"
+
+[deploy]
+startCommand = "npx serve -s build -l $PORT"
+
+[variables]
+NODE_ENV = "production"
+PORT = "3000"
