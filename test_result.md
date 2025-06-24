@@ -167,15 +167,54 @@ backend:
 
   - task: "Case Querying"
     implemented: true
-    working: false
+    working: true
     file: "/app/backend/server.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: false
         agent: "testing"
         comment: "Case querying endpoint (POST /api/query) is failing with a 500 error. The issue is related to MongoDB ObjectId serialization. The server is trying to return MongoDB ObjectId objects directly, which are not JSON serializable. This needs to be fixed by converting ObjectId to string in the query response."
+      - working: true
+        agent: "testing"
+        comment: "The Case Querying endpoint has been fixed. The MongoDB ObjectId serialization issue has been resolved. Successfully tested various query types including 'yesterday', 'today', 'lab', 'patient ID', and general text searches. All queries return properly serialized JSON responses."
+  
+  - task: "Feedback System"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "The new Feedback System is working correctly. Successfully tested submitting positive and negative feedback for cases, and retrieving feedback statistics via the /api/feedback/stats endpoint. The system correctly tracks feedback counts and calculates satisfaction rates."
+  
+  - task: "Advanced Search"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "The Advanced Search functionality is working correctly. Successfully tested POST /api/cases/search with various filters including date range, confidence score, file presence, and text search. All filters work as expected and return properly serialized results."
+  
+  - task: "Complete Enhanced Workflow"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "The complete enhanced workflow is working correctly. Successfully tested creating a case with complex patient data, uploading multiple files, analyzing with Gemini, submitting feedback, and searching for the case using advanced filters. The natural language query endpoint also works correctly with the fixed serialization."
 
 metadata:
   created_by: "testing_agent"
