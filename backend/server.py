@@ -271,6 +271,111 @@ async def log_audit_event(user_id: str, action: str, resource_id: Optional[str] 
 
 # Simple session storage (in production, use Redis or proper session management)
 active_sessions = {}
+
+# PDF Generation Functions
+def generate_case_pdf(case: dict) -> BytesIO:
+    """Generate PDF report for a clinical case"""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # Title
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        spaceAfter=30,
+        textColor=colors.darkblue
+    )
+    story.append(Paragraph("Clinical Case Analysis Report", title_style))
+    story.append(Spacer(1, 12))
+    
+    # Case Information
+    case_info_style = ParagraphStyle(
+        'CaseInfo',
+        parent=styles['Normal'],
+        fontSize=12,
+        spaceAfter=12
+    )
+    
+    story.append(Paragraph(f"<b>Case ID:</b> {case['id']}", case_info_style))
+    story.append(Paragraph(f"<b>Created:</b> {case['created_at']}", case_info_style))
+    story.append(Paragraph(f"<b>Doctor ID:</b> {case['doctor_id']}", case_info_style))
+    story.append(Paragraph(f"<b>Files Uploaded:</b> {len(case.get('uploaded_files', []))}", case_info_style))
+    story.append(Spacer(1, 12))
+    
+    # Patient Summary
+    story.append(Paragraph("<b>Patient Summary:</b>", styles['Heading2']))
+    story.append(Paragraph(case['patient_summary'], styles['Normal']))
+    story.append(Spacer(1, 12))
+    
+    if case.get('analysis_result'):
+        analysis = case['analysis_result']
+        
+        # SOAP Notes
+        story.append(Paragraph("<b>SOAP Notes:</b>", styles['Heading2']))
+        soap_data = [
+            ['Component', 'Description'],
+            ['Subjective', analysis['soap_note'].get('subjective', 'N/A')],
+            ['Objective', analysis['soap_note'].get('objective', 'N/A')],
+            ['Assessment', analysis['soap_note'].get('assessment', 'N/A')],
+            ['Plan', analysis['soap_note'].get('plan', 'N/A')],
+        ]
+        
+        soap_table = Table(soap_data, colWidths=[1.5*inch, 4.5*inch])
+        soap_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        story.append(soap_table)
+        story.append(Spacer(1, 12))
+        
+        # Differential Diagnoses
+        story.append(Paragraph("<b>Differential Diagnoses:</b>", styles['Heading2']))
+        for i, diagnosis in enumerate(analysis.get('differential_diagnoses', []), 1):
+            story.append(Paragraph(f"{i}. <b>{diagnosis.get('diagnosis', 'Unknown')} ({diagnosis.get('likelihood', 0)}%)</b>", styles['Normal']))
+            story.append(Paragraph(f"   Rationale: {diagnosis.get('rationale', 'N/A')}", styles['Normal']))
+            story.append(Spacer(1, 6))
+        
+        # Treatment Recommendations
+        story.append(Paragraph("<b>Treatment Recommendations:</b>", styles['Heading2']))
+        for i, treatment in enumerate(analysis.get('treatment_recommendations', []), 1):
+            story.append(Paragraph(f"{i}. {treatment}", styles['Normal']))
+        story.append(Spacer(1, 12))
+        
+        # Investigation Suggestions
+        story.append(Paragraph("<b>Investigation Suggestions:</b>", styles['Heading2']))
+        for i, investigation in enumerate(analysis.get('investigation_suggestions', []), 1):
+            story.append(Paragraph(f"{i}. {investigation}", styles['Normal']))
+        story.append(Spacer(1, 12))
+        
+        # File Interpretations
+        if analysis.get('file_interpretations'):
+            story.append(Paragraph("<b>File Interpretations:</b>", styles['Heading2']))
+            for interpretation in analysis['file_interpretations']:
+                story.append(Paragraph(f"<b>File:</b> {interpretation.get('file_name', 'Unknown')}", styles['Normal']))
+                story.append(Paragraph(f"<b>Type:</b> {interpretation.get('file_type', 'Unknown')}", styles['Normal']))
+                story.append(Paragraph(f"<b>Key Findings:</b> {', '.join(interpretation.get('key_findings', []))}", styles['Normal']))
+                story.append(Paragraph(f"<b>Clinical Significance:</b> {interpretation.get('clinical_significance', 'N/A')}", styles['Normal']))
+                story.append(Spacer(1, 6))
+        
+        # Confidence Score and Overall Assessment
+        story.append(Paragraph(f"<b>Confidence Score:</b> {analysis.get('confidence_score', 0)}%", styles['Heading3']))
+        story.append(Paragraph("<b>Overall Assessment:</b>", styles['Heading3']))
+        story.append(Paragraph(analysis.get('overall_assessment', 'N/A'), styles['Normal']))
+    
+    # Build PDF
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
 async def save_uploaded_file(file: UploadFile) -> Dict[str, Any]:
     """Save uploaded file and return file info"""
     file_id = str(uuid.uuid4())
