@@ -279,7 +279,10 @@ const AppContent = () => {
       // Create case
       const caseResponse = await axios.post(`${API}/api/cases`, {
         patient_summary: patientSummary,
-        doctor_id: currentUser.id
+        doctor_id: currentUser.id,
+        doctor_name: currentUser.full_name || currentUser.username,
+        ...patientDetails,
+        patient_age: patientDetails.patient_age ? parseInt(patientDetails.patient_age) : null
       });
       
       const caseId = caseResponse.data.id;
@@ -304,6 +307,13 @@ const AppContent = () => {
       
       // Reset form
       setPatientSummary('');
+      setPatientDetails({
+        patient_id: '',
+        patient_name: '',
+        patient_age: '',
+        patient_gender: '',
+        doctor_name: ''
+      });
       setSelectedFiles([]);
       
       // Reload cases
