@@ -440,13 +440,16 @@ const AppContent = () => {
           loadDoctorProfile(sessionToken);
         } else {
           localStorage.removeItem('sessionToken');
+          setCurrentView('login');
         }
       } else {
         console.log('No session token found');
+        setCurrentView('login');
       }
     } catch (error) {
       console.error('Auth check failed:', error);
       localStorage.removeItem('sessionToken');
+      setCurrentView('login');
     } finally {
       setAuthLoading(false);
     }
