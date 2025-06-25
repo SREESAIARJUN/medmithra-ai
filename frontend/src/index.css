@@ -205,6 +205,13 @@
     @apply dark:from-medical-700 dark:via-medical-800 dark:to-gray-900;
   }
 
+  /* Gradient mesh background */
+  .gradient-mesh {
+    background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+    background-size: 400% 400%;
+    animation: gradient-xy 15s ease infinite;
+  }
+
   /* Loading states */
   .loading {
     @apply animate-pulse;
