@@ -228,18 +228,22 @@ const AppContent = () => {
   };
 
   const register = async () => {
-    setLoading(true);
+    if (authLoading) return; // Prevent multiple simultaneous requests
+    
+    setAuthLoading(true);
+    setAuthError('');
     try {
       await axios.post(`${API}/api/auth/register`, registerData);
-      alert('Registration successful! Please login.');
       setCurrentView('login');
       setRegisterData({ username: '', email: '', password: '', full_name: '' });
+      setAuthError('Registration successful! Please login with your credentials.');
       
     } catch (error) {
       console.error('Registration failed:', error);
-      alert(error.response?.data?.detail || 'Registration failed');
+      const errorMessage = error.response?.data?.detail || 'Registration failed. Please check your information and try again.';
+      setAuthError(errorMessage);
     } finally {
-      setLoading(false);
+      setAuthLoading(false);
     }
   };
 
