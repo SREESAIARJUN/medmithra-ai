@@ -686,6 +686,75 @@ async def upload_files(case_id: str, files: List[UploadFile] = File(...)):
         logging.error(f"File upload error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# Doctor Profile Endpoints
+@api_router.get("/profile", response_model=UserProfile)
+async def get_doctor_profile(session_token: str):
+    """Get doctor profile information"""
+    try:
+        if session_token not in active_sessions:
+            raise HTTPException(status_code=401, detail="Invalid or expired session")
+        
+        user_info = active_sessions[session_token]
+        user = await db.users.find_one({"id": user_info["user_id"]})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Return profile info
+        profile = UserProfile(
+            medical_license=user.get("medical_license", ""),
+            specialization=user.get("specialization", ""),
+            years_of_experience=user.get("years_of_experience", 0),
+            hospital_affiliation=user.get("hospital_affiliation", ""),
+            phone_number=user.get("phone_number", ""),
+            full_name=user.get("full_name", ""),
+            bio=user.get("bio", ""),
+            email=user.get("email", "")
+        )
+        
+        return profile
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Profile retrieval error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.put("/profile")
+async def update_doctor_profile(session_token: str, profile_data: UserProfileUpdate):
+    """Update doctor profile information"""
+    try:
+        if session_token not in active_sessions:
+            raise HTTPException(status_code=401, detail="Invalid or expired session")
+        
+        user_info = active_sessions[session_token]
+        user = await db.users.find_one({"id": user_info["user_id"]})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Update profile fields (only non-None values)
+        update_fields = {}
+        for field, value in profile_data.dict(exclude_unset=True).items():
+            if value is not None:
+                update_fields[field] = value
+        
+        if update_fields:
+            await db.users.update_one(
+                {"id": user_info["user_id"]},
+                {"$set": update_fields}
+            )
+            
+            # Log audit event
+            await log_audit_event(user_info["user_id"], "profile_updated", 
+                                details=f"Profile updated: {', '.join(update_fields.keys())}")
+        
+        return {"message": "Profile updated successfully", "updated_fields": list(update_fields.keys())}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Profile update error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Authentication Endpoints
 @api_router.post("/auth/register", response_model=User)
 async def register_user(user_data: UserCreate):
