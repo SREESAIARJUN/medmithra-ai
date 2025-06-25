@@ -263,10 +263,10 @@ async def analyze_individual_files(uploaded_files: List[Dict[str, Any]]) -> List
             file_interpretations.append({
                 "file_name": file_info["original_name"],
                 "file_type": "error",
-                "key_findings": ["Analysis failed"],
-                "abnormal_values": [],
+                "key_findings": "Analysis failed",
+                "abnormal_values": "N/A",
                 "clinical_significance": f"Error in analysis: {str(e)}",
-                "recommendations": ["Retry analysis"],
+                "recommendations": "Retry analysis",
                 "full_interpretation": f"Error: {str(e)}"
             })
     
