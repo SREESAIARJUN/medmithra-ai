@@ -2140,7 +2140,7 @@ const AppContent = () => {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen">
-        {currentView === 'login' && renderLogin()}
+        {(currentView === 'login' || currentView === 'home') && renderLogin()}
         {currentView === 'register' && renderRegister()}
       </div>
     );
