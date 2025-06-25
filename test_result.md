@@ -328,7 +328,11 @@ metadata:
         comment: "Fixed authentication popup issues by replacing browser alert() with inline error displays, improved error handling with better user feedback, added loading states to prevent multiple simultaneous requests, implemented graceful error handling for network issues, added loading screen during authentication check, and improved overall UX with Enter key support and better visual feedback."
 test_plan:
   current_focus:
-    - "Modern UI/UX with Dark/Light Theme"
+    - "Doctor Profile Management"
+    - "File Upload"
+    - "Enhanced Patient Case Creation"
+    - "PDF Export"
+    - "Natural Language Query"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
