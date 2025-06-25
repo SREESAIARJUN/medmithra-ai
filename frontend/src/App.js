@@ -619,7 +619,7 @@ const AppContent = () => {
         
         <div className="space-y-6">
           <Input
-            label="Full Name"
+            label="Full Name *"
             type="text"
             value={registerData.full_name}
             onChange={(e) => setRegisterData({...registerData, full_name: e.target.value})}
@@ -628,7 +628,7 @@ const AppContent = () => {
           />
           
           <Input
-            label="Username"
+            label="Username *"
             type="text"
             value={registerData.username}
             onChange={(e) => setRegisterData({...registerData, username: e.target.value})}
@@ -637,7 +637,7 @@ const AppContent = () => {
           />
           
           <Input
-            label="Email"
+            label="Email *"
             type="email"
             value={registerData.email}
             onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
@@ -646,14 +646,61 @@ const AppContent = () => {
           />
           
           <Input
-            label="Password"
+            label="Medical License *"
+            type="text"
+            value={registerData.medical_license}
+            onChange={(e) => setRegisterData({...registerData, medical_license: e.target.value})}
+            placeholder="Enter your medical license number"
+            disabled={authLoading}
+          />
+          
+          <Input
+            label="Specialization *"
+            type="text"
+            value={registerData.specialization}
+            onChange={(e) => setRegisterData({...registerData, specialization: e.target.value})}
+            placeholder="e.g., Cardiology, Internal Medicine"
+            disabled={authLoading}
+          />
+          
+          <Input
+            label="Years of Experience *"
+            type="number"
+            min="0"
+            max="50"
+            value={registerData.years_of_experience}
+            onChange={(e) => setRegisterData({...registerData, years_of_experience: e.target.value})}
+            placeholder="Years of practice"
+            disabled={authLoading}
+          />
+          
+          <Input
+            label="Hospital Affiliation"
+            type="text"
+            value={registerData.hospital_affiliation}
+            onChange={(e) => setRegisterData({...registerData, hospital_affiliation: e.target.value})}
+            placeholder="Hospital or clinic name (optional)"
+            disabled={authLoading}
+          />
+          
+          <Input
+            label="Phone Number"
+            type="tel"
+            value={registerData.phone_number}
+            onChange={(e) => setRegisterData({...registerData, phone_number: e.target.value})}
+            placeholder="Contact number (optional)"
+            disabled={authLoading}
+          />
+          
+          <Input
+            label="Password *"
             type="password"
             value={registerData.password}
             onChange={(e) => setRegisterData({...registerData, password: e.target.value})}
-            placeholder="Choose a password"
+            placeholder="Choose a strong password"
             disabled={authLoading}
             onKeyPress={(e) => {
-              if (e.key === 'Enter' && registerData.username && registerData.password && registerData.email && registerData.full_name && !authLoading) {
+              if (e.key === 'Enter' && isRegistrationValid() && !authLoading) {
                 register();
               }
             }}
@@ -665,7 +712,7 @@ const AppContent = () => {
             className="w-full"
             onClick={register}
             loading={authLoading}
-            disabled={!registerData.username || !registerData.password || !registerData.email || !registerData.full_name || authLoading}
+            disabled={!isRegistrationValid() || authLoading}
           >
             {authLoading ? 'Creating Account...' : 'Create Account'}
           </Button>
