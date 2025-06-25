@@ -256,19 +256,38 @@ class AuthenticationAPITest(unittest.TestCase):
         """Test user logout endpoint"""
         print("\n=== Testing User Logout ===")
         
-        # First, ensure we have a valid session token
-        if not self.session_token:
-            login_payload = {
-                "username": self.test_username,
-                "password": self.test_password
-            }
-            response = requests.post(f"{API_URL}/auth/login", json=login_payload)
-            self.assertEqual(response.status_code, 200)
-            self.session_token = response.json()["session_token"]
+        # Create a new user and get a session token
+        timestamp = int(time.time())
+        random_suffix = generate_random_string()
+        logout_username = f"logoutuser_{timestamp}_{random_suffix}"
+        logout_email = f"logout_{timestamp}_{random_suffix}@example.com"
+        logout_password = "LogoutPassword123!"
+        
+        # Register
+        register_payload = {
+            "username": logout_username,
+            "email": logout_email,
+            "password": logout_password,
+            "full_name": "Logout Test User"
+        }
+        
+        register_response = requests.post(f"{API_URL}/auth/register", json=register_payload)
+        self.assertEqual(register_response.status_code, 200)
+        
+        # Login to get session token
+        login_payload = {
+            "username": logout_username,
+            "password": logout_password
+        }
+        
+        login_response = requests.post(f"{API_URL}/auth/login", json=login_payload)
+        self.assertEqual(login_response.status_code, 200)
+        session_token = login_response.json()["session_token"]
+        print(f"Created test user and obtained session token for logout test")
         
         # Test successful logout
         print("Testing successful logout")
-        response = requests.post(f"{API_URL}/auth/logout?session_token={self.session_token}")
+        response = requests.post(f"{API_URL}/auth/logout?session_token={session_token}")
         print(f"Logout response status: {response.status_code}")
         
         self.assertEqual(response.status_code, 200)
