@@ -7,7 +7,7 @@ export const LoginForm = ({ onSwitchToRegister }) => {
   const { login } = useAuth();
   const { isDark } = useTheme();
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: '',
   });
   const [loading, setLoading] = useState(false);
@@ -20,7 +20,7 @@ export const LoginForm = ({ onSwitchToRegister }) => {
     setLoading(true);
     setError('');
 
-    const result = await login(formData.email, formData.password);
+    const result = await login(formData.username, formData.password);
     
     if (!result.success) {
       setError(result.error);
@@ -69,14 +69,14 @@ export const LoginForm = ({ onSwitchToRegister }) => {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Input
-          label="Email Address"
-          type="email"
-          name="email"
-          value={formData.email}
+          label="Username"
+          type="text"
+          name="username"
+          value={formData.username}
           onChange={handleInputChange}
           onKeyPress={handleKeyPress}
           required
-          placeholder="Enter your email"
+          placeholder="Enter your username"
         />
 
         <Input
