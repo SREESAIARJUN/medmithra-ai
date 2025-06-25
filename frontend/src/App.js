@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthPage } from './components/AuthComponents';
-import { Dashboard } from './components/Dashboard';
+import { EnhancedDashboard } from './components/EnhancedDashboard';
+import { MultimodalCaseEntry } from './components/MultimodalCaseEntry';
+import { VoiceCommandInterface } from './components/VoiceCommandInterface';
 import { CreateCase, CasesList } from './components/CaseComponents';
 import { CaseDetail } from './components/CaseDetail';
 import { SearchCases } from './components/SearchComponents';
@@ -24,8 +26,13 @@ const AppContent = () => {
       <div className="min-h-screen hero-gradient flex items-center justify-center">
         <div className="text-center text-white">
           <div className="animate-spin rounded-full h-16 w-16 border-4 border-white border-t-transparent mx-auto mb-4"></div>
-          <h2 className="text-2xl font-bold mb-2">Clinical Insight Assistant</h2>
-          <p className="text-white/80">Loading your medical dashboard...</p>
+          <h2 className="text-2xl font-bold mb-2">🩺 Clinical Insight Assistant</h2>
+          <p className="text-white/80">Loading your AI-powered medical dashboard...</p>
+          <div className="mt-4 space-y-1 text-sm text-white/60">
+            <div>🤖 Initializing AI models</div>
+            <div>🎤 Loading speech recognition</div>
+            <div>📊 Preparing multimodal analysis</div>
+          </div>
         </div>
       </div>
     );
@@ -38,7 +45,11 @@ const AppContent = () => {
   // Render the appropriate view based on currentView
   switch (currentView) {
     case 'dashboard':
-      return <Dashboard onNavigate={navigate} />;
+      return <EnhancedDashboard onNavigate={navigate} />;
+    case 'multimodal-entry':
+      return <MultimodalCaseEntry onNavigate={navigate} />;
+    case 'voice-commands':
+      return <VoiceCommandInterface onNavigate={navigate} />;
     case 'create-case':
       return <CreateCase onNavigate={navigate} />;
     case 'cases':
@@ -50,7 +61,7 @@ const AppContent = () => {
     case 'profile':
       return <ProfileManagement onNavigate={navigate} />;
     default:
-      return <Dashboard onNavigate={navigate} />;
+      return <EnhancedDashboard onNavigate={navigate} />;
   }
 };
 
