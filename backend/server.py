@@ -924,94 +924,166 @@ async def get_case(case_id: str):
 
 @api_router.post("/query")
 async def query_cases(query_data: RetrievalQuery):
-    """Handle natural language queries about cases with improved command parsing"""
+    """Handle advanced natural language queries about cases with enhanced AI processing"""
     try:
-        # Advanced query processing
+        # Enhanced natural language query processing using Gemini
         query_lower = query_data.query.lower()
         
-        # Parse specific commands
-        response_text = ""
-        cases = []
+        # Use Gemini to understand the query intent and extract parameters
+        session_id = f"query-analysis-{uuid.uuid4()}"
+        chat = LlmChat(
+            api_key=GEMINI_API_KEY,
+            session_id=session_id,
+            system_message="""You are a medical query analysis AI. Parse natural language queries about medical cases and extract structured search parameters.
+
+            Respond in JSON format:
+            {
+                "query_type": "date_range|patient_search|symptom_search|diagnosis_search|general_search",
+                "date_filter": {
+                    "type": "today|yesterday|last_week|last_month|specific_date|date_range",
+                    "start_date": "YYYY-MM-DD or null",
+                    "end_date": "YYYY-MM-DD or null"
+                },
+                "patient_info": {
+                    "patient_id": "extracted patient ID or null",
+                    "patient_name": "extracted patient name or null",
+                    "age_range": "extracted age info or null",
+                    "gender": "extracted gender or null"
+                },
+                "medical_terms": ["list of extracted medical terms, symptoms, diagnoses"],
+                "test_types": ["list of lab tests, imaging studies mentioned"],
+                "confidence_filter": "high|medium|low|null",
+                "mongodb_query": "suggested MongoDB query structure"
+            }"""
+        ).with_model("gemini", "gemini-2.5-flash-preview-04-17").with_max_tokens(2048)
         
-        # Check for date-specific queries
-        if "yesterday" in query_lower:
-            from datetime import datetime, timedelta
-            yesterday = datetime.utcnow() - timedelta(days=1)
-            start_date = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
-            end_date = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
-            
-            cases = await db.clinical_cases.find({
-                "doctor_id": query_data.doctor_id,
-                "created_at": {
-                    "$gte": start_date,
-                    "$lte": end_date
-                }
-            }).to_list(10)
-            
-            response_text = f"Found {len(cases)} cases from yesterday"
-            
-        elif "today" in query_lower:
-            from datetime import datetime
-            today = datetime.utcnow()
-            start_date = today.replace(hour=0, minute=0, second=0, microsecond=0)
-            
-            cases = await db.clinical_cases.find({
-                "doctor_id": query_data.doctor_id,
-                "created_at": {"$gte": start_date}
-            }).to_list(10)
-            
-            response_text = f"Found {len(cases)} cases from today"
-            
-        # Check for specific test types
-        elif any(test in query_lower for test in ["cbc", "blood", "lab", "test"]):
-            cases = await db.clinical_cases.find({
-                "doctor_id": query_data.doctor_id,
-                "$or": [
-                    {"patient_summary": {"$regex": "lab|blood|cbc|test", "$options": "i"}},
-                    {"analysis_result.investigation_suggestions": {"$regex": "lab|blood|cbc|test", "$options": "i"}}
-                ]
-            }).to_list(10)
-            
-            response_text = f"Found {len(cases)} cases with lab/blood work"
-            
-        # Check for specific patient ID
-        elif "patient" in query_lower and any(char.isdigit() for char in query_lower):
+        analysis_prompt = f"""
+        Analyze this medical query and extract search parameters:
+        "{query_data.query}"
+        
+        Consider:
+        - Date/time references (today, yesterday, last week, specific dates)
+        - Patient information (IDs, names, demographics)
+        - Medical terms (symptoms, diagnoses, procedures)
+        - Lab tests or imaging studies
+        - Quality indicators (confidence scores, file presence)
+        
+        Return structured JSON for database searching.
+        """
+        
+        try:
+            response = await chat.send_message(UserMessage(text=analysis_prompt))
+            import json
             import re
-            patient_id_match = re.search(r'patient\s*(\d+)', query_lower)
-            if patient_id_match:
-                patient_id = patient_id_match.group(1)
-                cases = await db.clinical_cases.find({
-                    "doctor_id": query_data.doctor_id,
-                    "patient_summary": {"$regex": patient_id, "$options": "i"}
-                }).to_list(10)
+            
+            # Extract JSON from response
+            json_match = re.search(r'```json\s*(.*?)\s*```', response, re.DOTALL)
+            if json_match:
+                query_analysis = json.loads(json_match.group(1))
+            else:
+                query_analysis = json.loads(response)
                 
-                response_text = f"Found {len(cases)} cases for patient {patient_id}"
+        except Exception as e:
+            logging.error(f"Query analysis failed: {str(e)}")
+            # Fallback to basic processing
+            query_analysis = {"query_type": "general_search", "medical_terms": [query_data.query]}
+        
+        # Build enhanced MongoDB query based on AI analysis
+        mongo_query = {"doctor_id": query_data.doctor_id}
+        response_text = ""
+        
+        # Apply date filters
+        if query_analysis.get("date_filter", {}).get("type"):
+            date_type = query_analysis["date_filter"]["type"]
+            from datetime import datetime, timedelta
             
-        # General text search
-        else:
-            cases = await db.clinical_cases.find({
-                "doctor_id": query_data.doctor_id,
-                "$or": [
-                    {"patient_summary": {"$regex": query_lower, "$options": "i"}},
-                    {"analysis_result.overall_assessment": {"$regex": query_lower, "$options": "i"}},
-                    {"analysis_result.soap_note.subjective": {"$regex": query_lower, "$options": "i"}},
-                    {"analysis_result.soap_note.assessment": {"$regex": query_lower, "$options": "i"}}
-                ]
-            }).to_list(10)
+            if date_type == "today":
+                today = datetime.utcnow()
+                start_date = today.replace(hour=0, minute=0, second=0, microsecond=0)
+                mongo_query["created_at"] = {"$gte": start_date}
+                response_text = "Today's cases"
+                
+            elif date_type == "yesterday":
+                yesterday = datetime.utcnow() - timedelta(days=1)
+                start_date = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+                end_date = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
+                mongo_query["created_at"] = {"$gte": start_date, "$lte": end_date}
+                response_text = "Yesterday's cases"
+                
+            elif date_type == "last_week":
+                week_ago = datetime.utcnow() - timedelta(days=7)
+                mongo_query["created_at"] = {"$gte": week_ago}
+                response_text = "Cases from the last week"
+                
+            elif date_type == "last_month":
+                month_ago = datetime.utcnow() - timedelta(days=30)
+                mongo_query["created_at"] = {"$gte": month_ago}
+                response_text = "Cases from the last month"
+        
+        # Apply patient filters
+        patient_info = query_analysis.get("patient_info", {})
+        if patient_info.get("patient_id"):
+            mongo_query["patient_id"] = {"$regex": patient_info["patient_id"], "$options": "i"}
+            response_text += f" for patient ID {patient_info['patient_id']}"
             
-            response_text = f"Found {len(cases)} matching cases for: {query_data.query}"
+        if patient_info.get("patient_name"):
+            mongo_query["patient_name"] = {"$regex": patient_info["patient_name"], "$options": "i"}
+            response_text += f" for patient {patient_info['patient_name']}"
+        
+        # Apply medical term searches
+        medical_terms = query_analysis.get("medical_terms", [])
+        test_types = query_analysis.get("test_types", [])
+        
+        if medical_terms or test_types:
+            search_terms = medical_terms + test_types
+            search_regex = "|".join(search_terms)
+            mongo_query["$or"] = [
+                {"patient_summary": {"$regex": search_regex, "$options": "i"}},
+                {"analysis_result.overall_assessment": {"$regex": search_regex, "$options": "i"}},
+                {"analysis_result.soap_note.subjective": {"$regex": search_regex, "$options": "i"}},
+                {"analysis_result.soap_note.assessment": {"$regex": search_regex, "$options": "i"}},
+                {"analysis_result.differential_diagnoses.diagnosis": {"$regex": search_regex, "$options": "i"}}
+            ]
+            response_text += f" containing: {', '.join(search_terms[:3])}"
+            if len(search_terms) > 3:
+                response_text += f" and {len(search_terms) - 3} more terms"
+        
+        # Apply confidence filter
+        confidence_filter = query_analysis.get("confidence_filter")
+        if confidence_filter == "high":
+            mongo_query["confidence_score"] = {"$gte": 80}
+            response_text += " (high confidence)"
+        elif confidence_filter == "medium":
+            mongo_query["confidence_score"] = {"$gte": 60, "$lt": 80}
+            response_text += " (medium confidence)"
+        elif confidence_filter == "low":
+            mongo_query["confidence_score"] = {"$lt": 60}
+            response_text += " (low confidence)"
+        
+        # Fallback for general searches
+        if not response_text:
+            general_regex = query_data.query.replace(" ", "|")
+            mongo_query["$or"] = [
+                {"patient_summary": {"$regex": general_regex, "$options": "i"}},
+                {"analysis_result.overall_assessment": {"$regex": general_regex, "$options": "i"}},
+                {"analysis_result.soap_note.subjective": {"$regex": general_regex, "$options": "i"}},
+                {"analysis_result.soap_note.assessment": {"$regex": general_regex, "$options": "i"}}
+            ]
+            response_text = f"Cases matching: {query_data.query}"
+        
+        # Execute search
+        cases = await db.clinical_cases.find(mongo_query).sort("created_at", -1).to_list(20)
         
         if not cases:
-            return {"response": "No matching cases found for your query."}
+            return {"response": f"No cases found for: {query_data.query}"}
         
         # Convert MongoDB documents to serializable format
         serializable_cases = []
         for case in cases:
-            # Convert ObjectId to string if present
             if "_id" in case:
-                del case["_id"]  # Remove MongoDB ObjectId
+                del case["_id"]
             
-            # Convert datetime objects to ISO format strings
+            # Convert datetime objects
             if "created_at" in case and hasattr(case["created_at"], "isoformat"):
                 case["created_at"] = case["created_at"].isoformat()
             if "updated_at" in case and hasattr(case["updated_at"], "isoformat"):
@@ -1024,20 +1096,41 @@ async def query_cases(query_data: RetrievalQuery):
             
             serializable_cases.append(case)
         
-        # Add case summaries to response
-        if serializable_cases:
-            response_text += ":\n"
-            for case in serializable_cases[:3]:  # Show top 3
-                case_date = case.get('created_at', 'Unknown date')
-                if isinstance(case_date, str):
-                    try:
-                        case_date = datetime.fromisoformat(case_date.replace('Z', '+00:00')).strftime('%Y-%m-%d')
-                    except:
-                        case_date = case_date[:10] if len(case_date) > 10 else case_date
-                        
-                response_text += f"- Case from {case_date}: {case['patient_summary'][:100]}...\n"
+        # Generate AI-powered summary of results
+        if len(serializable_cases) > 0:
+            summary_prompt = f"""
+            Summarize the search results for the query: "{query_data.query}"
+            
+            Found {len(serializable_cases)} cases. Provide a brief, medical professional summary of:
+            1. What was found
+            2. Key patterns or insights
+            3. Notable findings across cases
+            
+            Keep it concise and medical professional.
+            """
+            
+            try:
+                summary_response = await chat.send_message(UserMessage(text=summary_prompt))
+                ai_summary = summary_response[:300] + "..." if len(summary_response) > 300 else summary_response
+            except:
+                ai_summary = f"Found {len(serializable_cases)} cases matching your query."
+            
+            response_text = f"{response_text}: Found {len(serializable_cases)} cases.\n\n{ai_summary}"
+            
+            # Add case highlights
+            if len(serializable_cases) <= 3:
+                response_text += "\n\nCase highlights:"
+                for case in serializable_cases[:3]:
+                    case_date = case.get('created_at', 'Unknown date')
+                    if isinstance(case_date, str):
+                        try:
+                            case_date = datetime.fromisoformat(case_date.replace('Z', '+00:00')).strftime('%Y-%m-%d')
+                        except:
+                            case_date = case_date[:10] if len(case_date) > 10 else case_date
+                    
+                    response_text += f"\n- {case_date}: {case['patient_summary'][:100]}..."
         
-        return {"response": response_text, "cases": serializable_cases}
+        return {"response": response_text, "cases": serializable_cases, "query_analysis": query_analysis}
         
     except Exception as e:
         logging.error(f"Query error: {str(e)}")
