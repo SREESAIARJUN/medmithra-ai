@@ -310,7 +310,11 @@ class ClinicalInsightAPITest(unittest.TestCase):
         print("Creating a complex case for advanced search testing")
         payload = {
             "patient_summary": self.complex_patient_summary,
-            "doctor_id": "test_doctor"
+            "doctor_id": "test_doctor",
+            "patient_id": "PT54321",
+            "patient_name": "Sarah Johnson",
+            "patient_age": 67,
+            "patient_gender": "Female"
         }
         
         response = requests.post(f"{API_URL}/cases", json=payload)
