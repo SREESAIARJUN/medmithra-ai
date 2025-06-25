@@ -700,7 +700,7 @@ const AppContent = () => {
             placeholder="Choose a strong password"
             disabled={authLoading}
             onKeyPress={(e) => {
-              if (e.key === 'Enter' && isRegistrationValid() && !authLoading) {
+              if (e.key === 'Enter' && registerData.username && registerData.password && registerData.email && registerData.full_name && registerData.medical_license && registerData.specialization && registerData.years_of_experience && !authLoading) {
                 register();
               }
             }}
