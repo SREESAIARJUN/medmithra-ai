@@ -86,10 +86,15 @@ class ClinicalCase(BaseModel):
 
 class ClinicalCaseCreate(BaseModel):
     patient_summary: str
-    patient_id: Optional[str] = None
-    patient_name: Optional[str] = None
-    patient_age: Optional[int] = None
-    patient_gender: Optional[str] = None
+    # Required patient fields
+    patient_id: str
+    patient_name: str
+    patient_age: int
+    patient_gender: str
+    # Optional fields
+    patient_dob: Optional[str] = None
+    patient_address: Optional[str] = None
+    emergency_contact: Optional[str] = None
     doctor_id: str = "default_doctor"
     doctor_name: Optional[str] = None
 
