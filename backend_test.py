@@ -529,7 +529,12 @@ class ClinicalInsightAPITest(unittest.TestCase):
             "username": test_username,
             "email": test_email,
             "password": test_password,
-            "full_name": "Test User"
+            "full_name": "Test User",
+            "medical_license": "MD12345",
+            "specialization": "Internal Medicine",
+            "years_of_experience": 5,
+            "hospital_affiliation": "Test Hospital",
+            "phone_number": "555-123-4567"
         }
         
         response = requests.post(f"{API_URL}/auth/register", json=register_payload)
