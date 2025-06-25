@@ -101,6 +101,8 @@ const AppContent = () => {
   // UI state
   const [currentView, setCurrentView] = useState('home');
   const [loading, setLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
   
   // Data state
   const [cases, setCases] = useState([]);
