@@ -170,6 +170,11 @@ const AppContent = () => {
     }
   }, [isAuthenticated]);
 
+  // Clear errors when switching views
+  useEffect(() => {
+    setAuthError('');
+  }, [currentView]);
+
   // Update patient summary when speech transcript changes
   useEffect(() => {
     if (transcript && currentView === 'new-case') {
