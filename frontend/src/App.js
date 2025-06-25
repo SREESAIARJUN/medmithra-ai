@@ -15,7 +15,6 @@ const App = () => {
 };
 
 export default App;
-  <div 
     className={`
       relative overflow-hidden
       bg-white/90 dark:bg-gray-900/90 
