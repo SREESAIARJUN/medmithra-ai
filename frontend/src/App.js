@@ -15,7 +15,6 @@ const App = () => {
 };
 
 export default App;
-    className={`
       relative overflow-hidden
       bg-white/90 dark:bg-gray-900/90 
       backdrop-blur-xl border border-white/20 dark:border-gray-700/30
