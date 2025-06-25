@@ -192,25 +192,44 @@ class AuthenticationAPITest(unittest.TestCase):
         """Test session verification endpoint"""
         print("\n=== Testing Session Verification ===")
         
-        # First, ensure we have a valid session token
-        if not self.session_token:
-            login_payload = {
-                "username": self.test_username,
-                "password": self.test_password
-            }
-            response = requests.post(f"{API_URL}/auth/login", json=login_payload)
-            self.assertEqual(response.status_code, 200)
-            self.session_token = response.json()["session_token"]
+        # Create a new user and get a session token
+        timestamp = int(time.time())
+        random_suffix = generate_random_string()
+        verify_username = f"verifyuser_{timestamp}_{random_suffix}"
+        verify_email = f"verify_{timestamp}_{random_suffix}@example.com"
+        verify_password = "VerifyPassword123!"
+        
+        # Register
+        register_payload = {
+            "username": verify_username,
+            "email": verify_email,
+            "password": verify_password,
+            "full_name": "Verify Test User"
+        }
+        
+        register_response = requests.post(f"{API_URL}/auth/register", json=register_payload)
+        self.assertEqual(register_response.status_code, 200)
+        
+        # Login to get session token
+        login_payload = {
+            "username": verify_username,
+            "password": verify_password
+        }
+        
+        login_response = requests.post(f"{API_URL}/auth/login", json=login_payload)
+        self.assertEqual(login_response.status_code, 200)
+        session_token = login_response.json()["session_token"]
+        print(f"Created test user and obtained session token for verification test")
         
         # Test valid session verification
         print("Testing valid session verification")
-        response = requests.get(f"{API_URL}/auth/verify?session_token={self.session_token}")
+        response = requests.get(f"{API_URL}/auth/verify?session_token={session_token}")
         print(f"Session verification response status: {response.status_code}")
         
         self.assertEqual(response.status_code, 200)
         verify_data = response.json()
         self.assertTrue(verify_data["valid"])
-        self.assertEqual(verify_data["user"]["username"], self.test_username)
+        self.assertEqual(verify_data["user"]["username"], verify_username)
         print("✅ Valid session correctly verified")
         
         # Test invalid session token
