@@ -7,11 +7,10 @@ const Card = ({ children, className = '', ...props }) => (
   <div 
     className={`
       relative overflow-hidden
-      bg-white/80 dark:bg-gray-900/80 
+      bg-white/90 dark:bg-gray-900/90 
       backdrop-blur-xl border border-white/20 dark:border-gray-700/30
-      rounded-2xl shadow-elevation-3 dark:shadow-soft-dark
-      before:absolute before:inset-0 before:bg-glass-gradient dark:before:bg-glass-gradient-dark before:pointer-events-none
-      hover:shadow-elevation-4 hover:scale-[1.02] transition-all duration-300
+      rounded-2xl shadow-lg hover:shadow-xl
+      transition-all duration-300 hover:scale-[1.02]
       ${className}
     `} 
     {...props}
