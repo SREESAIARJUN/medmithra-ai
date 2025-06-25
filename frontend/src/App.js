@@ -857,37 +857,63 @@ const AppContent = () => {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Patient Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Input
-                label="Patient ID"
+                label="Patient ID *"
                 value={patientDetails.patient_id}
                 onChange={(e) => setPatientDetails({...patientDetails, patient_id: e.target.value})}
-                placeholder="Patient ID"
+                placeholder="Patient ID (required)"
               />
               <Input
-                label="Patient Name"
+                label="Patient Name *"
                 value={patientDetails.patient_name}
                 onChange={(e) => setPatientDetails({...patientDetails, patient_name: e.target.value})}
-                placeholder="Patient full name"
+                placeholder="Patient full name (required)"
               />
               <Input
-                label="Age"
+                label="Age *"
                 type="number"
+                min="0"
+                max="150"
                 value={patientDetails.patient_age}
                 onChange={(e) => setPatientDetails({...patientDetails, patient_age: e.target.value})}
-                placeholder="Age"
+                placeholder="Age (required)"
               />
               <div className="form-group">
-                <label className="form-label">Gender</label>
+                <label className="form-label">Gender *</label>
                 <select
                   value={patientDetails.patient_gender}
                   onChange={(e) => setPatientDetails({...patientDetails, patient_gender: e.target.value})}
                   className="input"
+                  required
                 >
-                  <option value="">Select Gender</option>
+                  <option value="">Select Gender (required)</option>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
                   <option value="Other">Other</option>
                 </select>
               </div>
+            </div>
+            
+            {/* Additional Patient Information */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <Input
+                label="Date of Birth"
+                type="date"
+                value={patientDetails.patient_dob}
+                onChange={(e) => setPatientDetails({...patientDetails, patient_dob: e.target.value})}
+                placeholder="Date of birth (optional)"
+              />
+              <Input
+                label="Address"
+                value={patientDetails.patient_address}
+                onChange={(e) => setPatientDetails({...patientDetails, patient_address: e.target.value})}
+                placeholder="Patient address (optional)"
+              />
+              <Input
+                label="Emergency Contact"
+                value={patientDetails.emergency_contact}
+                onChange={(e) => setPatientDetails({...patientDetails, emergency_contact: e.target.value})}
+                placeholder="Emergency contact (optional)"
+              />
             </div>
           </div>
 
