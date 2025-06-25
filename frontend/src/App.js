@@ -186,6 +186,7 @@ const AppContent = () => {
   const checkAuthentication = async () => {
     if (!sessionToken) {
       setCurrentView('login');
+      setAuthLoading(false);
       return;
     }
 
