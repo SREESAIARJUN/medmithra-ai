@@ -227,7 +227,14 @@ const AppContent = () => {
       
     } catch (error) {
       console.error('Login failed:', error);
-      const errorMessage = error.response?.data?.detail || 'Login failed. Please check your credentials and try again.';
+      let errorMessage = 'Login failed. Please check your credentials and try again.';
+      
+      if (error.code === 'NETWORK_ERROR' || !error.response) {
+        errorMessage = 'Network connection error. Please check your internet connection and try again.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      }
+      
       setAuthError(errorMessage);
     } finally {
       setAuthLoading(false);
