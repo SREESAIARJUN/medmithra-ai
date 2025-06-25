@@ -185,6 +185,8 @@ const AppContent = () => {
     }
 
     try {
+      setAuthLoading(true);
+      setAuthError('');
       const response = await axios.get(`${API}/api/auth/verify?session_token=${sessionToken}`);
       if (response.data.valid) {
         setIsAuthenticated(true);
@@ -194,7 +196,10 @@ const AppContent = () => {
       }
     } catch (error) {
       console.error('Authentication check failed:', error);
+      setAuthError('Authentication check failed. Please try logging in again.');
       logout();
+    } finally {
+      setAuthLoading(false);
     }
   };
 
