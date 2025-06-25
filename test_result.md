@@ -134,6 +134,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "Case creation endpoint continues to work correctly. Successfully created multiple test cases with different patient summaries."
+      - working: true
+        agent: "testing"
+        comment: "Enhanced patient case creation is working correctly. The endpoint now properly validates required fields (patient_id, patient_name, patient_age, patient_gender) and rejects requests missing these fields with a 422 error. Doctor information is correctly captured during case creation."
 
   - task: "File Upload"
     implemented: true
@@ -149,6 +152,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "File upload endpoint continues to work correctly. Successfully uploaded multiple files to test cases."
+      - working: true
+        agent: "testing"
+        comment: "File upload functionality works correctly with multiple file types. Successfully tested uploading PDF, JPG, and PNG files to a case. The endpoint correctly processes different MIME types and returns proper file metadata."
 
   - task: "Clinical Analysis with Gemini"
     implemented: true
@@ -197,6 +203,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "Case querying endpoint continues to work correctly. Successfully tested all query types (text search, today, yesterday, lab test, patient ID) and verified proper serialization of MongoDB ObjectIds."
+      - working: true
+        agent: "testing"
+        comment: "Natural language query functionality works correctly with complex medical queries. Successfully tested various complex queries including symptom-based, diagnosis-based, lab value, demographic, and combined queries. The endpoint correctly analyzes query intent and returns relevant results."
   
   - task: "Feedback System"
     implemented: true
@@ -269,6 +278,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "PDF export functionality is working correctly. Successfully generated and downloaded a PDF report for a clinical case. The PDF contains all the expected sections including patient summary, SOAP notes, differential diagnoses, and treatment recommendations."
+      - working: true
+        agent: "testing"
+        comment: "Enhanced PDF generation with improved SOAP notes formatting is working correctly. Successfully generated a PDF with proper text wrapping in the SOAP notes section. The PDF includes all required sections and properly formats content for readability."
 
   - task: "Audit Trail"
     implemented: true
@@ -281,6 +293,18 @@ backend:
       - working: true
         agent: "testing"
         comment: "Audit trail functionality is working correctly. Successfully retrieved all audit logs, filtered logs by action type, and retrieved logs for a specific user. The system properly logs various actions including case creation, analysis, and user authentication events."
+      
+  - task: "Doctor Profile Management"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Doctor profile management endpoints are working correctly. Successfully tested GET /api/profile for retrieving doctor profile information and PUT /api/profile for updating profile information. Both endpoints properly require authentication and reject requests with invalid session tokens. Profile updates are correctly persisted and reflected in subsequent profile retrievals."
 
 metadata:
   created_by: "testing_agent"
