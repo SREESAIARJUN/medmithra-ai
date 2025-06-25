@@ -198,6 +198,13 @@ module.exports = {
         'glass-dark': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
         'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
         'soft-dark': '0 2px 15px -3px rgba(0, 0, 0, 0.3), 0 10px 20px -2px rgba(0, 0, 0, 0.2)',
+        'neon': '0 0 5px theme(colors.primary.400), 0 0 20px theme(colors.primary.600), 0 0 35px theme(colors.primary.800)',
+        'neon-accent': '0 0 5px theme(colors.accent.400), 0 0 20px theme(colors.accent.600), 0 0 35px theme(colors.accent.800)',
+        'inner-glow': 'inset 0 1px 0 0 rgba(255, 255, 255, 0.1)',
+        'elevation-1': '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+        'elevation-2': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+        'elevation-3': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+        'elevation-4': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
       },
       backdropBlur: {
         xs: '2px',
