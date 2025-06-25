@@ -370,7 +370,7 @@ export const CaseDetail = ({ caseId, onNavigate }) => {
           <div className="mt-6 space-y-6">
             <Card className="p-6 soap-card">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                SOAP Notes
+                📋 SOAP Notes
               </h2>
               <div className="prose dark:prose-invert max-w-none">
                 <pre className="whitespace-pre-wrap font-sans text-sm text-gray-700 dark:text-gray-300">
@@ -381,7 +381,7 @@ export const CaseDetail = ({ caseId, onNavigate }) => {
 
             <Card className="p-6 diagnosis-card">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Differential Diagnoses
+                🔍 Differential Diagnoses
               </h2>
               <div className="prose dark:prose-invert max-w-none">
                 <pre className="whitespace-pre-wrap font-sans text-sm text-gray-700 dark:text-gray-300">
@@ -392,7 +392,7 @@ export const CaseDetail = ({ caseId, onNavigate }) => {
 
             <Card className="p-6 recommendation-card">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Treatment Recommendations
+                💊 Treatment Recommendations
               </h2>
               <div className="prose dark:prose-invert max-w-none">
                 <pre className="whitespace-pre-wrap font-sans text-sm text-gray-700 dark:text-gray-300">
@@ -401,19 +401,100 @@ export const CaseDetail = ({ caseId, onNavigate }) => {
               </div>
             </Card>
 
+            {/* AI File Interpretations */}
+            {caseData.analysis_result.file_interpretations && caseData.analysis_result.file_interpretations.length > 0 && (
+              <Card className="p-6">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                  🤖 AI File Interpretations
+                </h2>
+                <div className="space-y-4">
+                  {caseData.analysis_result.file_interpretations.map((interpretation, index) => (
+                    <CollapsibleSection 
+                      key={index} 
+                      title={`📄 ${interpretation.file_name}`}
+                      defaultOpen
+                    >
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">🔍 Key Findings</h4>
+                            <p className="text-gray-700 dark:text-gray-300 text-sm">{interpretation.key_findings}</p>
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">📊 File Type</h4>
+                            <Badge variant="secondary">{interpretation.file_type}</Badge>
+                          </div>
+                        </div>
+                        
+                        {interpretation.abnormal_values !== 'None detected' && (
+                          <div>
+                            <h4 className="font-medium text-red-700 dark:text-red-400 mb-2">⚠️ Abnormal Values</h4>
+                            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                              <p className="text-red-600 dark:text-red-400 text-sm">{interpretation.abnormal_values}</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div>
+                          <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">🏥 Clinical Significance</h4>
+                          <p className="text-gray-700 dark:text-gray-300 text-sm">{interpretation.clinical_significance}</p>
+                        </div>
+                        
+                        <div>
+                          <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">💡 Recommendations</h4>
+                          <p className="text-gray-700 dark:text-gray-300 text-sm">{interpretation.recommendations}</p>
+                        </div>
+                        
+                        {interpretation.full_interpretation && (
+                          <CollapsibleSection title="📋 Full AI Interpretation" className="mt-4">
+                            <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                              <pre className="whitespace-pre-wrap font-sans text-xs text-gray-700 dark:text-gray-300">
+{interpretation.full_interpretation}
+                              </pre>
+                            </div>
+                          </CollapsibleSection>
+                        )}
+                      </div>
+                    </CollapsibleSection>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {/* Confidence Score */}
+            {caseData.analysis_result.confidence_score && (
+              <Card className="p-6 text-center">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                  🎯 AI Confidence Score
+                </h2>
+                <div className="text-4xl font-bold text-primary-600 dark:text-primary-400 mb-2">
+                  {caseData.analysis_result.confidence_score}%
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-4">
+                  <div 
+                    className="bg-gradient-to-r from-primary-500 to-primary-600 h-4 rounded-full transition-all"
+                    style={{ width: `${caseData.analysis_result.confidence_score}%` }}
+                  />
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                  Overall confidence in the AI analysis based on available data
+                </p>
+              </Card>
+            )}
+
             {/* Feedback Section */}
             <Card className="p-6">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Provide Feedback
+                📝 Provide Feedback on AI Analysis
               </h2>
               <p className="text-gray-600 dark:text-gray-400 mb-4">
-                How helpful was this analysis? Your feedback helps improve our AI system.
+                How helpful was this AI analysis? Your feedback helps improve our AI system.
               </p>
               <div className="space-y-4">
                 <textarea
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
-                  placeholder="Optional comments about the analysis quality..."
+                  placeholder="Optional comments about the analysis quality, accuracy, and usefulness..."
                   className="textarea w-full"
                   rows="3"
                 />
@@ -423,14 +504,14 @@ export const CaseDetail = ({ caseId, onNavigate }) => {
                     onClick={() => handleFeedback(true)}
                   >
                     <Icons.ThumbsUp />
-                    Helpful
+                    Helpful Analysis
                   </Button>
                   <Button
                     variant="error"
                     onClick={() => handleFeedback(false)}
                   >
                     <Icons.ThumbsDown />
-                    Not Helpful
+                    Needs Improvement
                   </Button>
                 </div>
               </div>
