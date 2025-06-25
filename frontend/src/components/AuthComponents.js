@@ -124,8 +124,11 @@ export const RegisterForm = ({ onSwitchToLogin }) => {
     password: '',
     confirmPassword: '',
     fullName: '',
-    specialty: '',
-    licenseNumber: '',
+    specialization: '',
+    medicalLicense: '',
+    yearsOfExperience: '',
+    hospitalAffiliation: '',
+    phoneNumber: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -144,6 +147,11 @@ export const RegisterForm = ({ onSwitchToLogin }) => {
       return;
     }
 
+    if (!formData.yearsOfExperience || formData.yearsOfExperience < 0) {
+      setError('Please enter a valid number of years of experience');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -152,8 +160,11 @@ export const RegisterForm = ({ onSwitchToLogin }) => {
       formData.email,
       formData.password,
       formData.fullName,
-      formData.specialty,
-      formData.licenseNumber
+      formData.specialization,
+      formData.medicalLicense,
+      parseInt(formData.yearsOfExperience),
+      formData.hospitalAffiliation || null,
+      formData.phoneNumber || null
     );
     
     if (!result.success) {
@@ -171,7 +182,7 @@ export const RegisterForm = ({ onSwitchToLogin }) => {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto p-8">
+    <Card className="w-full max-w-lg mx-auto p-8">
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
           Join Clinical Insight
@@ -198,7 +209,7 @@ export const RegisterForm = ({ onSwitchToLogin }) => {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 gap-4">
           <Input
-            label="Full Name"
+            label="Full Name *"
             type="text"
             name="fullName"
             value={formData.fullName}
@@ -208,7 +219,7 @@ export const RegisterForm = ({ onSwitchToLogin }) => {
           />
 
           <Input
-            label="Username"
+            label="Username *"
             type="text"
             name="username"
             value={formData.username}
@@ -218,7 +229,7 @@ export const RegisterForm = ({ onSwitchToLogin }) => {
           />
 
           <Input
-            label="Email Address"
+            label="Email Address *"
             type="email"
             name="email"
             value={formData.email}
@@ -228,27 +239,56 @@ export const RegisterForm = ({ onSwitchToLogin }) => {
           />
 
           <Input
-            label="Specialty"
+            label="Specialization *"
             type="text"
-            name="specialty"
-            value={formData.specialty}
+            name="specialization"
+            value={formData.specialization}
             onChange={handleInputChange}
             required
             placeholder="Cardiology, Internal Medicine, etc."
           />
 
           <Input
-            label="License Number"
+            label="Medical License *"
             type="text"
-            name="licenseNumber"
-            value={formData.licenseNumber}
+            name="medicalLicense"
+            value={formData.medicalLicense}
             onChange={handleInputChange}
             required
             placeholder="Medical license number"
           />
 
           <Input
-            label="Password"
+            label="Years of Experience *"
+            type="number"
+            name="yearsOfExperience"
+            value={formData.yearsOfExperience}
+            onChange={handleInputChange}
+            required
+            min="0"
+            placeholder="e.g., 5"
+          />
+
+          <Input
+            label="Hospital Affiliation"
+            type="text"
+            name="hospitalAffiliation"
+            value={formData.hospitalAffiliation}
+            onChange={handleInputChange}
+            placeholder="Hospital or clinic name (optional)"
+          />
+
+          <Input
+            label="Phone Number"
+            type="tel"
+            name="phoneNumber"
+            value={formData.phoneNumber}
+            onChange={handleInputChange}
+            placeholder="+1 (555) 123-4567 (optional)"
+          />
+
+          <Input
+            label="Password *"
             type="password"
             name="password"
             value={formData.password}
@@ -258,7 +298,7 @@ export const RegisterForm = ({ onSwitchToLogin }) => {
           />
 
           <Input
-            label="Confirm Password"
+            label="Confirm Password *"
             type="password"
             name="confirmPassword"
             value={formData.confirmPassword}
