@@ -115,7 +115,12 @@ const AppContent = () => {
     username: '', 
     email: '', 
     password: '', 
-    full_name: '' 
+    full_name: '',
+    medical_license: '',
+    specialization: '',
+    years_of_experience: '',
+    hospital_affiliation: '',
+    phone_number: ''
   });
   
   // New case form state
