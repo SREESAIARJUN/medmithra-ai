@@ -426,10 +426,13 @@ const AppContent = () => {
     try {
       const sessionToken = localStorage.getItem('sessionToken');
       if (sessionToken) {
+        console.log('Checking session token:', sessionToken);
         const response = await axios.get(`${API_BASE_URL}/api/auth/verify`, {
-          params: { session_token: sessionToken }
+          params: { session_token: sessionToken },
+          timeout: 10000 // 10 second timeout
         });
         
+        console.log('Auth response:', response.data);
         if (response.data.valid) {
           setIsAuthenticated(true);
           setCurrentUser(response.data.user);
@@ -438,6 +441,8 @@ const AppContent = () => {
         } else {
           localStorage.removeItem('sessionToken');
         }
+      } else {
+        console.log('No session token found');
       }
     } catch (error) {
       console.error('Auth check failed:', error);
