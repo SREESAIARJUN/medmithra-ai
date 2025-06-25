@@ -1364,6 +1364,11 @@ const AppContent = () => {
     </div>
   );
 
+  // Show loading screen during initial authentication check
+  if (authLoading && !isAuthenticated && !authError) {
+    return renderLoadingScreen();
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen">
