@@ -458,6 +458,25 @@ const AppContent = () => {
           </p>
         </div>
         
+        {/* Error Message Display */}
+        {authError && (
+          <div className={`mb-6 p-4 rounded-lg border ${
+            authError.includes('successful') 
+              ? 'bg-success-50 border-success-200 text-success-800 dark:bg-success-900/20 dark:border-success-800 dark:text-success-300'
+              : 'bg-error-50 border-error-200 text-error-800 dark:bg-error-900/20 dark:border-error-800 dark:text-error-300'
+          }`}>
+            <div className="flex items-center">
+              <span className="text-sm font-medium">{authError}</span>
+              <button 
+                onClick={() => setAuthError('')}
+                className="ml-auto text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+        
         <div className="space-y-6">
           <Input
             label="Username"
@@ -465,6 +484,7 @@ const AppContent = () => {
             value={loginData.username}
             onChange={(e) => setLoginData({...loginData, username: e.target.value})}
             placeholder="Enter your username"
+            disabled={authLoading}
           />
           
           <Input
@@ -473,6 +493,12 @@ const AppContent = () => {
             value={loginData.password}
             onChange={(e) => setLoginData({...loginData, password: e.target.value})}
             placeholder="Enter your password"
+            disabled={authLoading}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && loginData.username && loginData.password && !authLoading) {
+                login();
+              }
+            }}
           />
           
           <Button
@@ -480,18 +506,22 @@ const AppContent = () => {
             size="lg"
             className="w-full"
             onClick={login}
-            loading={loading}
-            disabled={!loginData.username || !loginData.password}
+            loading={authLoading}
+            disabled={!loginData.username || !loginData.password || authLoading}
           >
-            Sign In
+            {authLoading ? 'Signing In...' : 'Sign In'}
           </Button>
           
           <div className="text-center">
             <p className="text-gray-600 dark:text-gray-400">
               Don't have an account?{' '}
               <button 
-                onClick={() => setCurrentView('register')}
+                onClick={() => {
+                  setCurrentView('register');
+                  setAuthError('');
+                }}
                 className="text-primary-600 dark:text-primary-400 hover:text-primary-500 font-medium transition-colors"
+                disabled={authLoading}
               >
                 Register here
               </button>
