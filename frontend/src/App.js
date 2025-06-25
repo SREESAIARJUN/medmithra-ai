@@ -266,6 +266,7 @@ const AppContent = () => {
       localStorage.removeItem('sessionToken');
       setCurrentUser(null);
       setIsAuthenticated(false);
+      setAuthError('');
       setCurrentView('login');
     }
   };
