@@ -15,7 +15,6 @@ const App = () => {
 };
 
 export default App;
-const Card = ({ children, className = '', ...props }) => (
   <div 
     className={`
       relative overflow-hidden
