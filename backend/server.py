@@ -166,6 +166,25 @@ class AuditLog(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     ip_address: Optional[str] = None
 
+class UserProfile(BaseModel):
+    medical_license: str
+    specialization: str
+    years_of_experience: int
+    hospital_affiliation: str
+    phone_number: str
+    full_name: str
+    bio: Optional[str] = None
+    email: str
+
+class UserProfileUpdate(BaseModel):
+    medical_license: Optional[str] = None
+    specialization: Optional[str] = None
+    years_of_experience: Optional[int] = None
+    hospital_affiliation: Optional[str] = None
+    phone_number: Optional[str] = None
+    full_name: Optional[str] = None
+    bio: Optional[str] = None
+
 class SearchFilters(BaseModel):
     doctor_id: str = "default_doctor"
     date_from: Optional[str] = None
