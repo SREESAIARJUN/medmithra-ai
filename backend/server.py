@@ -249,10 +249,10 @@ async def analyze_individual_files(uploaded_files: List[Dict[str, Any]]) -> List
                 file_interpretation = {
                     "file_name": file_info["original_name"],
                     "file_type": "analysis_completed",
-                    "key_findings": ["See detailed interpretation"],
-                    "abnormal_values": [],
+                    "key_findings": "See detailed interpretation",
+                    "abnormal_values": "See detailed analysis",
                     "clinical_significance": response[:300],
-                    "recommendations": ["Review detailed analysis"],
+                    "recommendations": "Review detailed analysis",
                     "full_interpretation": response[:500]
                 }
             
