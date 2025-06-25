@@ -387,7 +387,11 @@ class ClinicalInsightAPITest(unittest.TestCase):
         print("1. Creating a case with complex patient data")
         payload = {
             "patient_summary": "67-year-old female with diabetes presents with acute chest pain, elevated troponin levels, and shortness of breath. History of hypertension and smoking.",
-            "doctor_id": "test_doctor"
+            "doctor_id": "test_doctor",
+            "patient_id": "PT67890",
+            "patient_name": "Jane Smith",
+            "patient_age": 67,
+            "patient_gender": "Female"
         }
         
         response = requests.post(f"{API_URL}/cases", json=payload)
