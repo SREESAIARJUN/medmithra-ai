@@ -156,6 +156,7 @@ const AppContent = () => {
 
   // Check authentication on component mount
   useEffect(() => {
+    setAuthLoading(true);
     checkAuthentication();
   }, []);
 
