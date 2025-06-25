@@ -712,7 +712,7 @@ const AppContent = () => {
             className="w-full"
             onClick={register}
             loading={authLoading}
-            disabled={!isRegistrationValid() || authLoading}
+            disabled={!registerData.username || !registerData.password || !registerData.email || !registerData.full_name || !registerData.medical_license || !registerData.specialization || !registerData.years_of_experience || authLoading}
           >
             {authLoading ? 'Creating Account...' : 'Create Account'}
           </Button>
