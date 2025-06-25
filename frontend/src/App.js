@@ -204,7 +204,10 @@ const AppContent = () => {
   };
 
   const login = async () => {
-    setLoading(true);
+    if (authLoading) return; // Prevent multiple simultaneous requests
+    
+    setAuthLoading(true);
+    setAuthError('');
     try {
       const response = await axios.post(`${API}/api/auth/login`, loginData);
       const { session_token, user } = response.data;
@@ -217,9 +220,10 @@ const AppContent = () => {
       
     } catch (error) {
       console.error('Login failed:', error);
-      alert(error.response?.data?.detail || 'Login failed');
+      const errorMessage = error.response?.data?.detail || 'Login failed. Please check your credentials and try again.';
+      setAuthError(errorMessage);
     } finally {
-      setLoading(false);
+      setAuthLoading(false);
     }
   };
 
