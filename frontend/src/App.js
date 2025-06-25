@@ -257,7 +257,7 @@ const AppContent = () => {
     try {
       await axios.post(`${API}/api/auth/register`, registerData);
       setCurrentView('login');
-      setRegisterData({ username: '', email: '', password: '', full_name: '' });
+      setRegisterData({ username: '', email: '', password: '', full_name: '', medical_license: '', specialization: '', years_of_experience: '', hospital_affiliation: '', phone_number: '' });
       setAuthError('Registration successful! Please login with your credentials.');
       
     } catch (error) {
@@ -274,6 +274,17 @@ const AppContent = () => {
     } finally {
       setAuthLoading(false);
     }
+  };
+
+  // Helper function to validate registration form
+  const isRegistrationValid = () => {
+    return registerData.username && 
+           registerData.password && 
+           registerData.email && 
+           registerData.full_name &&
+           registerData.medical_license &&
+           registerData.specialization &&
+           registerData.years_of_experience;
   };
 
   const logout = async () => {
