@@ -238,10 +238,10 @@ async def analyze_individual_files(uploaded_files: List[Dict[str, Any]]) -> List
                 file_interpretation = {
                     "file_name": file_info["original_name"],
                     "file_type": analysis_data.get("file_type", "unknown"),
-                    "key_findings": analysis_data.get("key_findings", []),
-                    "abnormal_values": analysis_data.get("abnormal_values", []),
+                    "key_findings": ", ".join(analysis_data.get("key_findings", [])) if analysis_data.get("key_findings") else "No specific findings",
+                    "abnormal_values": ", ".join(analysis_data.get("abnormal_values", [])) if analysis_data.get("abnormal_values") else "None detected",
                     "clinical_significance": analysis_data.get("clinical_significance", "No specific findings"),
-                    "recommendations": analysis_data.get("recommendations", []),
+                    "recommendations": ", ".join(analysis_data.get("recommendations", [])) if analysis_data.get("recommendations") else "None",
                     "full_interpretation": response[:500]  # Keep full response as backup
                 }
             except json.JSONDecodeError:
