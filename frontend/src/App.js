@@ -448,6 +448,25 @@ const AppContent = () => {
     }
   };
 
+  const renderLoadingScreen = () => (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="text-center">
+        <div className="flex items-center justify-center mb-6">
+          <div className="p-4 bg-gradient-to-r from-medical-500 to-medical-600 rounded-full">
+            <Icons.Medical />
+          </div>
+        </div>
+        <LoadingSpinner size="lg" className="mx-auto mb-4" />
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          Clinical Insight Assistant
+        </h2>
+        <p className="text-gray-600 dark:text-gray-400">
+          Loading your medical dashboard...
+        </p>
+      </div>
+    </div>
+  );
+
   const renderLogin = () => (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-900 dark:to-gray-800 animate-fade-in">
       <Card className="w-full max-w-md p-8 m-4">
