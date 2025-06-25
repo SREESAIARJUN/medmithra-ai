@@ -79,7 +79,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (username, email, password, fullName, specialty, licenseNumber) => {
+  const register = async (username, email, password, fullName, specialization, medicalLicense, yearsOfExperience, hospitalAffiliation, phoneNumber) => {
     try {
       setError('');
       const response = await fetch(`${apiUrl}/api/auth/register`, {
@@ -92,8 +92,11 @@ export const AuthProvider = ({ children }) => {
           email,
           password,
           full_name: fullName,
-          specialty,
-          license_number: licenseNumber,
+          specialization,
+          medical_license: medicalLicense,
+          years_of_experience: yearsOfExperience,
+          hospital_affiliation: hospitalAffiliation,
+          phone_number: phoneNumber,
         }),
       });
 
