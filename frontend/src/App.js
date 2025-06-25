@@ -254,7 +254,14 @@ const AppContent = () => {
       
     } catch (error) {
       console.error('Registration failed:', error);
-      const errorMessage = error.response?.data?.detail || 'Registration failed. Please check your information and try again.';
+      let errorMessage = 'Registration failed. Please check your information and try again.';
+      
+      if (error.code === 'NETWORK_ERROR' || !error.response) {
+        errorMessage = 'Network connection error. Please check your internet connection and try again.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      }
+      
       setAuthError(errorMessage);
     } finally {
       setAuthLoading(false);
