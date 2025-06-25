@@ -355,24 +355,34 @@ def generate_case_pdf(case: dict) -> BytesIO:
     if case.get('analysis_result'):
         analysis = case['analysis_result']
         
-        # SOAP Notes
+        # SOAP Notes with proper text wrapping
         story.append(Paragraph("<b>SOAP Notes:</b>", styles['Heading2']))
-        soap_data = [
-            ['Component', 'Description'],
-            ['Subjective', analysis['soap_note'].get('subjective', 'N/A')],
-            ['Objective', analysis['soap_note'].get('objective', 'N/A')],
-            ['Assessment', analysis['soap_note'].get('assessment', 'N/A')],
-            ['Plan', analysis['soap_note'].get('plan', 'N/A')],
+        
+        # Create a table data structure with wrapped paragraphs
+        soap_wrapped_data = [
+            [Paragraph('<b>Component</b>', styles['Normal']), Paragraph('<b>Description</b>', styles['Normal'])]
         ]
         
-        soap_table = Table(soap_data, colWidths=[1.5*inch, 4.5*inch])
+        # Add each SOAP component with proper text wrapping
+        for component, key in [('Subjective', 'subjective'), ('Objective', 'objective'), ('Assessment', 'assessment'), ('Plan', 'plan')]:
+            content = analysis['soap_note'].get(key, 'N/A')
+            soap_wrapped_data.append([
+                Paragraph(f'<b>{component}</b>', styles['Normal']),
+                Paragraph(content, styles['Normal'])
+            ])
+        
+        soap_table = Table(soap_wrapped_data, colWidths=[1.5*inch, 4.5*inch])
         soap_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('TOPPADDING', (0, 1), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
