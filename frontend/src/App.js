@@ -130,6 +130,9 @@ const AppContent = () => {
     patient_name: '',
     patient_age: '',
     patient_gender: '',
+    patient_dob: '',
+    patient_address: '',
+    emergency_contact: '',
     doctor_name: ''
   });
   const [selectedFiles, setSelectedFiles] = useState([]);
