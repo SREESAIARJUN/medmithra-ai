@@ -105,10 +105,28 @@ class AuthenticationAPITest(unittest.TestCase):
         """Test user login endpoint"""
         print("\n=== Testing User Login ===")
         
+        # Register a new user specifically for this test
+        timestamp = int(time.time())
+        random_suffix = generate_random_string()
+        login_username = f"loginuser_{timestamp}_{random_suffix}"
+        login_email = f"login_{timestamp}_{random_suffix}@example.com"
+        login_password = "LoginPassword123!"
+        
+        register_payload = {
+            "username": login_username,
+            "email": login_email,
+            "password": login_password,
+            "full_name": "Login Test User"
+        }
+        
+        register_response = requests.post(f"{API_URL}/auth/register", json=register_payload)
+        self.assertEqual(register_response.status_code, 200)
+        print(f"Created test user for login test: {login_username}")
+        
         # Test successful login
         login_payload = {
-            "username": self.test_username,
-            "password": self.test_password
+            "username": login_username,
+            "password": login_password
         }
         
         response = requests.post(f"{API_URL}/auth/login", json=login_payload)
@@ -118,8 +136,8 @@ class AuthenticationAPITest(unittest.TestCase):
         login_data = response.json()
         self.assertIn("session_token", login_data)
         self.assertIn("user", login_data)
-        self.assertEqual(login_data["user"]["username"], self.test_username)
-        self.assertEqual(login_data["user"]["email"], self.test_email)
+        self.assertEqual(login_data["user"]["username"], login_username)
+        self.assertEqual(login_data["user"]["email"], login_email)
         
         # Save session token for subsequent tests
         self.session_token = login_data["session_token"]
