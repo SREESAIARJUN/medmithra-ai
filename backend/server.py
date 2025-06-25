@@ -363,29 +363,32 @@ def generate_case_pdf(case: dict) -> BytesIO:
             [Paragraph('<b>Component</b>', styles['Normal']), Paragraph('<b>Description</b>', styles['Normal'])]
         ]
         
-        # Add each SOAP component with proper text wrapping
+        # Add each SOAP component with proper text wrapping and better formatting
         for component, key in [('Subjective', 'subjective'), ('Objective', 'objective'), ('Assessment', 'assessment'), ('Plan', 'plan')]:
             content = analysis['soap_note'].get(key, 'N/A')
+            # Ensure content is properly wrapped and formatted
+            wrapped_content = content.replace('\n', '<br/>')[:1000]  # Limit length and preserve line breaks
             soap_wrapped_data.append([
                 Paragraph(f'<b>{component}</b>', styles['Normal']),
-                Paragraph(content, styles['Normal'])
+                Paragraph(wrapped_content, styles['Normal'])
             ])
         
-        soap_table = Table(soap_wrapped_data, colWidths=[1.5*inch, 4.5*inch])
+        soap_table = Table(soap_wrapped_data, colWidths=[1.5*inch, 4*inch])  # Adjusted width
         soap_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),  # Slightly smaller font
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('TOPPADDING', (0, 1), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('WORDWRAP', (0, 0), (-1, -1), True),  # Enable word wrapping
         ]))
         story.append(soap_table)
         story.append(Spacer(1, 12))
