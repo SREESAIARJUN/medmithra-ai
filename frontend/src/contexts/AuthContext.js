@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }) => {
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('authToken', data.session_token);
         setUser(data.user);
         return { success: true };
       } else {
