@@ -47,7 +47,11 @@ class ClinicalInsightAPITest(unittest.TestCase):
         print("\n=== Testing Case Creation ===")
         payload = {
             "patient_summary": self.sample_patient_summary,
-            "doctor_id": "test_doctor"
+            "doctor_id": "test_doctor",
+            "patient_id": "PT12345",
+            "patient_name": "John Doe",
+            "patient_age": 45,
+            "patient_gender": "Male"
         }
         
         response = requests.post(f"{API_URL}/cases", json=payload)
