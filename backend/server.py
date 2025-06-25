@@ -756,7 +756,7 @@ async def update_doctor_profile(session_token: str, profile_data: UserProfileUpd
         raise HTTPException(status_code=500, detail=str(e))
 
 # Authentication Endpoints
-@api_router.post("/auth/register", response_model=User)
+@api_router.post("/auth/register")
 async def register_user(user_data: UserCreate):
     """Register a new user"""
     try:
@@ -779,10 +779,27 @@ async def register_user(user_data: UserCreate):
         user_obj = User(**user_dict)
         await db.users.insert_one(user_obj.dict())
         
+        # Create session token for the new user (auto-login after registration)
+        session_token = create_session_token()
+        active_sessions[session_token] = {
+            "user_id": user_obj.id,
+            "username": user_obj.username,
+            "created_at": datetime.utcnow()
+        }
+        
         # Log audit event
         await log_audit_event(user_obj.id, "user_registered", details=f"User {user_data.username} registered")
         
-        return user_obj
+        return {
+            "message": "Registration successful",
+            "session_token": session_token,
+            "user": {
+                "id": user_obj.id,
+                "username": user_obj.username,
+                "full_name": user_obj.full_name,
+                "email": user_obj.email
+            }
+        }
         
     except HTTPException:
         raise
