@@ -1,6 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import './App.css';
+import React from 'react';
 
 // Enhanced UI Components with ultra-modern design
 const Card = ({ children, className = '', ...props }) => (
